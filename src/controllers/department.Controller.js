@@ -47,4 +47,25 @@ const createDepartment = async (req, res) => {
     }
 };
 
-module.exports = { createDepartment };
+const getDepartments = async (req, res) => {
+  try {
+    const departments = await Department.find({
+      isActive: true,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Departments fetched successfully",
+      departments,
+    });
+  } catch (error) {
+  
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+module.exports = { createDepartment, getDepartments };
