@@ -12,9 +12,11 @@ const { authorizeRoles } = require("./middleware/role.middleware");
 
 const authRoutes = require("./routes/auth.routes");
 const departmentRoutes = require("./routes/department.routes");
+const doctorRoutes = require("./routes/doctor.routes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/departments", departmentRoutes);
+app.use("/api/doctors", doctorRoutes);
 
 // Protected route: logged-in user only
 app.get("/api/auth/me", protect, (req, res) => {
