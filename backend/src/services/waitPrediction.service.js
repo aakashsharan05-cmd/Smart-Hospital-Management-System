@@ -9,6 +9,8 @@
  * predictedWaitMinutes on the appointment.
  */
 
+const path = require("path");
+const fs = require("fs");
 const Appointment = require("../models/appointment.model");
 const Doctor = require("../models/doctor.model");
 const {
@@ -17,6 +19,21 @@ const {
   getKolkataDayRange,
 } = require("../utils/timezone");
 const { sortAppointmentsByQueueOrder } = require("../utils/queueOrder");
+
+// Load heuristic baseline MAE from metrics.json if available (about 12 min)
+let heuristicTypicalError = null;
+try {
+  const metricsPath = path.resolve(__dirname, "../../../ml/models/metrics.json");
+  if (fs.existsSync(metricsPath)) {
+    const raw = JSON.parse(fs.readFileSync(metricsPath, "utf-8"));
+    const hMae = raw?.metrics?.heuristic_formula?.mae;
+    if (hMae !== undefined && !isNaN(Number(hMae))) {
+      heuristicTypicalError = Math.round(Number(hMae) * 10) / 10;
+    }
+  }
+} catch {
+  heuristicTypicalError = null;
+}
 
 /**
  * Predict wait time for a given queue length using ML service with 1.5s timeout,
@@ -61,6 +78,7 @@ const computeWaitTime = async ({
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Connection: "close",
       },
       body: JSON.stringify(payload),
       signal: controller.signal,
@@ -82,9 +100,9 @@ const computeWaitTime = async ({
           data.typicalErrorMinutes ??
           data.mae;
         const typicalErrorMinutes =
-          rawTypicalError !== undefined && !isNaN(Number(rawTypicalError))
+          rawTypicalError !== undefined && rawTypicalError !== null && !isNaN(Number(rawTypicalError))
             ? Math.round(Number(rawTypicalError) * 10) / 10
-            : 2.4;
+            : null;
 
         return {
           predictedWaitMinutes: Math.max(0, Math.round(Number(rawPrediction))),
@@ -100,7 +118,7 @@ const computeWaitTime = async ({
 
   return {
     predictedWaitMinutes: Math.round(fallbackWait),
-    typicalErrorMinutes: 5.0,
+    typicalErrorMinutes: heuristicTypicalError,
     waitPredictionSource: "fallback-formula",
   };
 };

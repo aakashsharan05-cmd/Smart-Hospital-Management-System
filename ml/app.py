@@ -20,7 +20,7 @@ METRICS_PATH = os.path.join(BASE_DIR, "models", "metrics.json")
 
 # Global pipeline instance and typical error (MAE on held-out validation residuals)
 model_pipeline = None
-typical_error_minutes = 2.4
+typical_error_minutes: Optional[float] = None
 
 def load_metrics():
     global typical_error_minutes
@@ -28,14 +28,17 @@ def load_metrics():
         try:
             with open(METRICS_PATH, "r") as f:
                 data = json.load(f)
-                mae = data.get("metrics", {}).get("random_forest", {}).get("mae", 2.4)
-                typical_error_minutes = round(float(mae), 1)
-                print(f"[FastAPI] Loaded typical error (MAE on validation residuals): ±{typical_error_minutes} min")
+                mae = data.get("metrics", {}).get("random_forest", {}).get("mae")
+                if mae is not None:
+                    typical_error_minutes = round(float(mae), 1)
+                    print(f"[FastAPI] Loaded typical error (MAE on validation residuals): ±{typical_error_minutes} min")
+                else:
+                    typical_error_minutes = None
         except Exception as e:
-            print(f"[FastAPI] Note: Error reading metrics.json: {e}. Using default 2.4 min.")
-            typical_error_minutes = 2.4
+            print(f"[FastAPI] Note: Error reading metrics.json: {e}")
+            typical_error_minutes = None
     else:
-        typical_error_minutes = 2.4
+        typical_error_minutes = None
 
 def load_model():
     global model_pipeline
@@ -121,11 +124,10 @@ class WaitPredictionResponse(BaseModel):
         description="Predicted wait time in minutes (non-negative integer)",
         examples=[45],
     )
-    typical_error_minutes: float = Field(
-        ...,
+    typical_error_minutes: Optional[float] = Field(
+        default=None,
         ge=0.0,
         description="Typical prediction error (Mean Absolute Error on hold-out validation residuals)",
-        examples=[2.4],
     )
 
 @app.get("/health", status_code=status.HTTP_200_OK)

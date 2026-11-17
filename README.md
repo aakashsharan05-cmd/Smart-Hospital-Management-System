@@ -280,7 +280,10 @@ npm run build
 Due to the absence of historical electronic health records (EHR) in cold-start deployments, the wait-time model was trained on a calibrated 10,000-sample synthetic dataset. While distributions reflect empirical outpatient clinic operations (department baselines, doctor experience discount curves, and diurnal surge peaks), real hospital operations may exhibit higher variance from emergency room patient diversions. Periodic retraining on real accumulated consultation logs (`checkInTime` to `consultationStartTime`) is strongly recommended.
 
 ### 2. Wait-Time Estimates are NOT Guarantees
-All wait-time predictions are explicitly labeled as approximate (`~X min`) with an honest empirical uncertainty metric (`Typical prediction error: 2.4 min`). Clinical complications, doctor availability shifts, or emergency triage can cause actual wait times to deviate.
+All wait-time predictions in the application are explicitly presented with the caveat:
+> *"Estimate only. Based on simulated data, not guaranteed."*
+
+Because models are initially trained on synthetic/simulated outpatient data, real clinic operations may exhibit different variance patterns. Periodic retraining on real accumulated clinic consultation logs (`checkInTime` to `consultationStartTime`) is essential for production clinical accuracy.
 
 ### 3. AI Symptom Triage is NOT a Medical Diagnosis
 The AI triage assistant is strictly designed for operational department routing and preliminary urgency categorization. It is **not** a diagnostic device and should never replace clinical examination. All triage responses carry the mandatory disclaimer:
