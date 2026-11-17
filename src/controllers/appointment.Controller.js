@@ -2,6 +2,14 @@ const Appointment = require("../models/appointment.model");
 const Doctor = require("../models/doctor.model");
 const mongoose = require("mongoose");
 
+// Normalize a Date to its 30-minute slot start (e.g. 10:15 -> 10:00:00.000, 10:45 -> 10:30:00.000)
+const normalizeSlotStart = (date) => {
+  const normalized = new Date(date);
+  const minutes = normalized.getMinutes();
+  normalized.setMinutes(minutes < 30 ? 0 : 30, 0, 0);
+  return normalized;
+};
+
 // ── Patient books an appointment ──────────────────────────
 const bookAppointment = async (req, res) => {
   try {
@@ -64,14 +72,12 @@ const bookAppointment = async (req, res) => {
       });
     }
 
-    // Check for conflicting appointment (same doctor, same time slot)
-    // We match within a 30-minute window to prevent overlapping slots
-    const slotStart = new Date(date);
-    const slotEnd = new Date(date.getTime() + 30 * 60 * 1000);
+    // Normalize appointmentDate and slotStart to the 30-minute slot boundary
+    const slotStart = normalizeSlotStart(date);
 
     const existingAppointment = await Appointment.findOne({
       doctor: doctor._id,
-      appointmentDate: { $gte: slotStart, $lt: slotEnd },
+      slotStart,
       status: { $nin: ["cancelled", "rejected"] },
     });
 
@@ -82,10 +88,10 @@ const bookAppointment = async (req, res) => {
       });
     }
 
-    // Also check if the PATIENT already has an appointment at this time
+    // Also check if the PATIENT already has an appointment at this slot
     const patientConflict = await Appointment.findOne({
       patient: req.user.userId,
-      appointmentDate: { $gte: slotStart, $lt: slotEnd },
+      slotStart,
       status: { $nin: ["cancelled", "rejected"] },
     });
 
@@ -108,12 +114,14 @@ const bookAppointment = async (req, res) => {
       status: { $nin: ["cancelled", "rejected"] },
     });
 
-    // Create appointment
+    // Create appointment with normalized slot
     const appointment = await Appointment.create({
       patient: req.user.userId,
       doctor: doctor._id,
       department: doctor.department,
-      appointmentDate: date,
+      appointmentDate: slotStart,
+      slotStart,
+      isSlotActive: true,
       reason: reason.trim(),
       queueNumber: appointmentsToday + 1,
     });
@@ -465,14 +473,13 @@ const rescheduleAppointment = async (req, res) => {
       }
     }
 
-    // Check for conflicts at new time
-    const slotStart = new Date(newDate);
-    const slotEnd = new Date(newDate.getTime() + 30 * 60 * 1000);
+    // Check for conflicts at new 30-min normalized slot
+    const newSlotStart = normalizeSlotStart(newDate);
 
     const conflict = await Appointment.findOne({
       _id: { $ne: appointment._id },
       doctor: appointment.doctor,
-      appointmentDate: { $gte: slotStart, $lt: slotEnd },
+      slotStart: newSlotStart,
       status: { $nin: ["cancelled", "rejected"] },
     });
 
@@ -483,7 +490,9 @@ const rescheduleAppointment = async (req, res) => {
       });
     }
 
-    appointment.appointmentDate = newDate;
+    appointment.appointmentDate = newSlotStart;
+    appointment.slotStart = newSlotStart;
+    appointment.isSlotActive = true;
     appointment.status = "pending"; // Reset to pending after reschedule
     await appointment.save();
 
