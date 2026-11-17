@@ -1,5 +1,5 @@
 const http = require("http");
-const { computeWaitTime } = require("../src/services/waitPrediction.service");
+const { computeWaitTime, computeBatchWaitTimes } = require("../src/services/waitPrediction.service");
 
 describe("Wait-Time Prediction & Timeout Tests", () => {
   test("Fallback formula correctly computes 5 + queueLength * DEFAULT_CONSULT_MIN", async () => {
@@ -94,6 +94,48 @@ describe("Wait-Time Prediction & Timeout Tests", () => {
     const fallbackRes = await computeWaitTime({ queueLength: 1 });
     expect(fallbackRes.waitPredictionSource).toBe("fallback-formula");
     expect(fallbackRes.typicalErrorMinutes).toBe(12.2);
+  });
+
+  test("Batch wait prediction computes all queue positions in single batch call", async () => {
+    let batchCallCount = 0;
+    const batchServer = http.createServer((req, res) => {
+      if (req.url === "/predict-batch" && req.method === "POST") {
+        batchCallCount++;
+        let body = "";
+        req.on("data", (chunk) => { body += chunk; });
+        req.on("end", () => {
+          const parsed = JSON.parse(body);
+          const predictions = parsed.items.map((it) => ({
+            predicted_wait_minutes: it.queue_length * 15 + 5,
+            typical_error_minutes: 2.1,
+          }));
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ predictions }));
+        });
+      }
+    });
+
+    await new Promise((r) => batchServer.listen(0, r));
+    const port = batchServer.address().port;
+    process.env.ML_SERVICE_URL = `http://127.0.0.1:${port}`;
+
+    const items = [
+      { queueLength: 0, departmentName: "Cardiology", doctorExperience: 10 },
+      { queueLength: 1, departmentName: "Cardiology", doctorExperience: 10 },
+      { queueLength: 2, departmentName: "Cardiology", doctorExperience: 10 },
+    ];
+
+    const results = await computeBatchWaitTimes(items);
+    if (batchServer.closeAllConnections) batchServer.closeAllConnections();
+    await new Promise((r) => batchServer.close(r));
+    delete process.env.ML_SERVICE_URL;
+
+    expect(batchCallCount).toBe(1); // Exactly one batch call for all items
+    expect(results.length).toBe(3);
+    expect(results[0].predictedWaitMinutes).toBe(5);
+    expect(results[1].predictedWaitMinutes).toBe(20);
+    expect(results[2].predictedWaitMinutes).toBe(35);
+    expect(results[0].waitPredictionSource).toBe("ml-model");
   });
 
   afterAll(async () => {

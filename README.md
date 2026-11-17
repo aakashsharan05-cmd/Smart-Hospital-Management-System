@@ -151,6 +151,7 @@ pip install -r requirements.txt
 uvicorn app:app --host 0.0.0.0 --port 8000 --reload
 ```
 *Health check:* Verify `GET http://localhost:8000/health` returns `status: "ok"`.
+*Security notice:* The ML prediction microservice is an internal service for server-to-server backend communication only; **never expose this microservice publicly** to external clients. CORS is restricted to backend origins.
 
 #### Terminal 2: Node.js Backend API & Socket.IO Server
 ```bash

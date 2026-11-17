@@ -127,3 +127,46 @@ def test_empty_department_rejected(client):
     }
     response = client.post("/predict", json=payload)
     assert response.status_code == 422
+
+def test_batch_prediction_endpoint(client):
+    """Test POST /predict-batch returns array of predictions matching inputs."""
+    payload = {
+        "items": [
+            {
+                "queue_length": 0,
+                "day_of_week": 1,
+                "hour": 10,
+                "department": "Cardiology",
+                "doctor_experience": 10,
+            },
+            {
+                "queue_length": 3,
+                "day_of_week": 1,
+                "hour": 10,
+                "department": "Cardiology",
+                "doctor_experience": 10,
+            },
+        ]
+    }
+    response = client.post("/predict-batch", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert "predictions" in data
+    assert len(data["predictions"]) == 2
+    pred0 = data["predictions"][0]["predicted_wait_minutes"]
+    pred1 = data["predictions"][1]["predicted_wait_minutes"]
+    assert pred1 > pred0
+    assert data["predictions"][0]["typical_error_minutes"] is not None
+
+def test_cors_security_restricted():
+    """Verify CORS middleware disallows credentials and does not use wildcard origins."""
+    from fastapi.middleware.cors import CORSMiddleware
+    cors_mw = None
+    for mw in app.user_middleware:
+        if mw.cls == CORSMiddleware:
+            cors_mw = mw
+            break
+
+    assert cors_mw is not None
+    assert cors_mw.kwargs.get("allow_credentials") is False
+    assert "*" not in cors_mw.kwargs.get("allow_origins", [])

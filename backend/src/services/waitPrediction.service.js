@@ -124,8 +124,81 @@ const computeWaitTime = async ({
 };
 
 /**
+ * Compute wait times in batch for multiple queue items in one ML service call.
+ * Uses POST /predict-batch with a 1.5s timeout.
+ * Falls back to heuristic formula if ML service is unreachable.
+ */
+const computeBatchWaitTimes = async (items) => {
+  if (!Array.isArray(items) || items.length === 0) return [];
+
+  const mlServiceUrl = process.env.ML_SERVICE_URL;
+  const defaultConsultMin = Number(process.env.DEFAULT_CONSULT_MIN || 8);
+
+  if (mlServiceUrl) {
+    const endpoint = `${mlServiceUrl.replace(/\/$/, "")}/predict-batch`;
+    const now = new Date();
+    const dayOfWeek = toModelDayOfWeek(now);
+    const hour = getKolkataHour(now);
+
+    const payload = {
+      items: items.map((it) => ({
+        queue_length: Math.max(0, it.queueLength || 0),
+        day_of_week: dayOfWeek,
+        hour,
+        department: it.departmentName || "",
+        doctor_experience: it.doctorExperience || 5,
+      })),
+    };
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 1500);
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Connection: "close",
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        const data = await response.json();
+        const predictions = data.predictions;
+        if (Array.isArray(predictions) && predictions.length === items.length) {
+          return predictions.map((pred) => ({
+            predictedWaitMinutes: Math.max(0, Math.round(Number(pred.predicted_wait_minutes ?? 0))),
+            typicalErrorMinutes:
+              pred.typical_error_minutes !== undefined && pred.typical_error_minutes !== null
+                ? Math.round(Number(pred.typical_error_minutes) * 10) / 10
+                : null,
+            waitPredictionSource: "ml-model",
+          }));
+        }
+      }
+    } catch {
+      // Fall through to formula fallback
+    }
+  }
+
+  // Fallback formula calculation for each item
+  return items.map((it) => {
+    const fallbackWait = 5 + Math.max(0, it.queueLength || 0) * defaultConsultMin;
+    return {
+      predictedWaitMinutes: Math.round(fallbackWait),
+      typicalErrorMinutes: heuristicTypicalError,
+      waitPredictionSource: "fallback-formula",
+    };
+  });
+};
+
+/**
  * Recompute wait times for all currently waiting (in-queue) appointments of a doctor,
- * updating the DB documents directly.
+ * updating the DB documents directly in a single batch operation.
  *
  * @param {string|mongoose.Types.ObjectId} doctorId
  * @returns {Promise<Array<Appointment>>}
@@ -156,31 +229,30 @@ const updateQueueWaitEstimates = async (doctorId) => {
   // Queue order is arrival order: in-consultation first, then checkInTime ascending (tie-break queueNumber)
   // Note: queueNumber is a token label, not queue order.
   const waitingAppointments = sortAppointmentsByQueueOrder(rawWaiting);
+  if (waitingAppointments.length === 0) return [];
 
-  const updatedAppointments = [];
+  const queueItems = waitingAppointments.map((appt, i) => ({
+    queueLength: inConsultCount + i,
+    departmentName,
+    doctorExperience,
+  }));
+
+  const predictions = await computeBatchWaitTimes(queueItems);
 
   for (let i = 0; i < waitingAppointments.length; i++) {
     const appt = waitingAppointments[i];
-    const queueLengthAhead = inConsultCount + i;
-
-    const { predictedWaitMinutes, typicalErrorMinutes, waitPredictionSource } = await computeWaitTime({
-      queueLength: queueLengthAhead,
-      date: new Date(),
-      departmentName,
-      doctorExperience,
-    });
-
-    appt.predictedWaitMinutes = predictedWaitMinutes;
-    appt.typicalErrorMinutes = typicalErrorMinutes;
-    appt.waitPredictionSource = waitPredictionSource;
+    const pred = predictions[i];
+    appt.predictedWaitMinutes = pred.predictedWaitMinutes;
+    appt.typicalErrorMinutes = pred.typicalErrorMinutes;
+    appt.waitPredictionSource = pred.waitPredictionSource;
     await appt.save();
-    updatedAppointments.push(appt);
   }
 
-  return updatedAppointments;
+  return waitingAppointments;
 };
 
 module.exports = {
   computeWaitTime,
+  computeBatchWaitTimes,
   updateQueueWaitEstimates,
 };

@@ -74,12 +74,19 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Allowed backend origins for internal server-to-server communication
+ALLOWED_BACKEND_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("ALLOWED_ORIGINS", "http://localhost:5000,http://127.0.0.1:5000").split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=ALLOWED_BACKEND_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
 )
 
 class WaitPredictionRequest(BaseModel):
@@ -130,6 +137,18 @@ class WaitPredictionResponse(BaseModel):
         description="Typical prediction error (Mean Absolute Error on hold-out validation residuals)",
     )
 
+class BatchWaitPredictionRequest(BaseModel):
+    items: list[WaitPredictionRequest] = Field(
+        ...,
+        description="List of wait prediction requests for queue items",
+    )
+
+class BatchWaitPredictionResponse(BaseModel):
+    predictions: list[WaitPredictionResponse] = Field(
+        ...,
+        description="List of prediction responses in matching order",
+    )
+
 @app.get("/health", status_code=status.HTTP_200_OK)
 def health_check():
     return {
@@ -176,6 +195,51 @@ def predict_wait_time(request: WaitPredictionRequest):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Inference error during wait-time prediction: {str(e)}",
+        )
+
+@app.post(
+    "/predict-batch",
+    response_model=BatchWaitPredictionResponse,
+    status_code=status.HTTP_200_OK,
+)
+def predict_wait_time_batch(request: BatchWaitPredictionRequest):
+    if model_pipeline is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Wait-time prediction model is not loaded or unavailable",
+        )
+
+    if not request.items:
+        return BatchWaitPredictionResponse(predictions=[])
+
+    try:
+        rows = [
+            {
+                "queue_length": item.queue_length,
+                "day_of_week": item.day_of_week,
+                "hour": item.hour,
+                "department": item.department.strip(),
+                "doctor_experience": item.doctor_experience,
+            }
+            for item in request.items
+        ]
+        input_df = pd.DataFrame(rows)
+        raw_preds = model_pipeline.predict(input_df)
+
+        predictions = [
+            WaitPredictionResponse(
+                predicted_wait_minutes=max(0, int(round(float(p)))),
+                typical_error_minutes=typical_error_minutes,
+            )
+            for p in raw_preds
+        ]
+
+        return BatchWaitPredictionResponse(predictions=predictions)
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Inference error during batch prediction: {str(e)}",
         )
 
 if __name__ == "__main__":
