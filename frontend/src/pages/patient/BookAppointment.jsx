@@ -1,0 +1,520 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  getDepartments,
+  getDoctors,
+  bookAppointment,
+  getErrorMessage,
+} from '../../services/api';
+import { Card, CardContent } from '../../components/ui/Card';
+import Button from '../../components/ui/Button';
+import Select from '../../components/ui/Select';
+import Input from '../../components/ui/Input';
+import Alert from '../../components/ui/Alert';
+import Badge from '../../components/ui/Badge';
+import LoadingSpinner from '../../components/LoadingSpinner';
+import {
+  IoCalendarOutline,
+  IoCheckmarkCircle,
+  IoPersonOutline,
+  IoCashOutline,
+  IoTimeOutline,
+  IoArrowForward,
+} from 'react-icons/io5';
+
+const DAYS_OF_WEEK = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+];
+
+const BookAppointment = () => {
+  const navigate = useNavigate();
+
+  // Data sources
+  const [departments, setDepartments] = useState([]);
+  const [doctors, setDoctors] = useState([]);
+  const [loadingDepts, setLoadingDepts] = useState(true);
+  const [loadingDocs, setLoadingDocs] = useState(false);
+
+  // Form selections
+  const [selectedDepartment, setSelectedDepartment] = useState('');
+  const [selectedDoctorId, setSelectedDoctorId] = useState('');
+  const [appointmentDate, setAppointmentDate] = useState('');
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState('');
+  const [reason, setReason] = useState('');
+
+  // States
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [successData, setSuccessData] = useState(null);
+
+  // 1. Fetch departments on mount
+  useEffect(() => {
+    let isMounted = true;
+    const fetchDepts = async () => {
+      try {
+        setLoadingDepts(true);
+        const res = await getDepartments();
+        if (isMounted) {
+          setDepartments(res.departments || []);
+        }
+      } catch (err) {
+        console.error('Error fetching departments:', err);
+        if (isMounted) {
+          setError(getErrorMessage(err));
+        }
+      } finally {
+        if (isMounted) {
+          setLoadingDepts(false);
+        }
+      }
+    };
+
+    fetchDepts();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // 2. Fetch doctors when department changes
+  useEffect(() => {
+    if (!selectedDepartment) {
+      setDoctors([]);
+      setSelectedDoctorId('');
+      return;
+    }
+
+    let isMounted = true;
+    const fetchDocs = async () => {
+      try {
+        setLoadingDocs(true);
+        const res = await getDoctors({ department: selectedDepartment });
+        if (isMounted) {
+          setDoctors(res.doctors || []);
+          setSelectedDoctorId('');
+          setAppointmentDate('');
+          setSelectedTimeSlot('');
+        }
+      } catch (err) {
+        console.error('Error fetching doctors:', err);
+        if (isMounted) {
+          setError(getErrorMessage(err));
+        }
+      } finally {
+        if (isMounted) {
+          setLoadingDocs(false);
+        }
+      }
+    };
+
+    fetchDocs();
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedDepartment]);
+
+  // Find currently selected doctor object
+  const selectedDoctor = useMemo(() => {
+    return doctors.find((d) => d._id === selectedDoctorId) || null;
+  }, [doctors, selectedDoctorId]);
+
+  // Generate 30-min time slots from doctor's availableTime (e.g. 09:00 to 17:00)
+  const timeSlots = useMemo(() => {
+    if (!selectedDoctor) return [];
+
+    const startTime = selectedDoctor.availableTime?.start || '09:00';
+    const endTime = selectedDoctor.availableTime?.end || '17:00';
+
+    const parseMinutes = (timeStr) => {
+      const [h, m] = timeStr.split(':').map(Number);
+      return h * 60 + (m || 0);
+    };
+
+    const formatMinutes = (totalMinutes) => {
+      const h = Math.floor(totalMinutes / 60);
+      const m = totalMinutes % 60;
+      const hStr = h.toString().padStart(2, '0');
+      const mStr = m.toString().padStart(2, '0');
+      return `${hStr}:${mStr}`;
+    };
+
+    const startMin = parseMinutes(startTime);
+    const endMin = parseMinutes(endTime);
+    const slots = [];
+
+    for (let current = startMin; current < endMin; current += 30) {
+      slots.push(formatMinutes(current));
+    }
+
+    return slots;
+  }, [selectedDoctor]);
+
+  // Validate if selected date falls on an available day
+  const isDateValidForDoctor = (dateStr) => {
+    if (!dateStr || !selectedDoctor) return false;
+    // Check future date
+    const selected = new Date(dateStr + 'T00:00:00');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (selected < today) return false;
+
+    // Check available days
+    const dayName = DAYS_OF_WEEK[selected.getDay()];
+    if (
+      selectedDoctor.availableDays &&
+      selectedDoctor.availableDays.length > 0 &&
+      !selectedDoctor.availableDays.includes(dayName)
+    ) {
+      return false;
+    }
+    return true;
+  };
+
+  const handleDateChange = (e) => {
+    const val = e.target.value;
+    setAppointmentDate(val);
+    setSelectedTimeSlot('');
+
+    if (val && selectedDoctor) {
+      const selected = new Date(val + 'T00:00:00');
+      const dayName = DAYS_OF_WEEK[selected.getDay()];
+      if (
+        selectedDoctor.availableDays &&
+        selectedDoctor.availableDays.length > 0 &&
+        !selectedDoctor.availableDays.includes(dayName)
+      ) {
+        setError(
+          `Dr. ${selectedDoctor.userId?.name || 'Doctor'} is not available on ${dayName}s. Available days: ${selectedDoctor.availableDays.join(', ')}`
+        );
+      } else {
+        setError('');
+      }
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    if (!selectedDepartment) {
+      setError('Please choose a medical department.');
+      return;
+    }
+    if (!selectedDoctorId) {
+      setError('Please choose a doctor for consultation.');
+      return;
+    }
+    if (!appointmentDate) {
+      setError('Please choose a valid appointment date.');
+      return;
+    }
+    if (!isDateValidForDoctor(appointmentDate)) {
+      setError('Selected appointment date is invalid or doctor is not available on this day.');
+      return;
+    }
+    if (!selectedTimeSlot) {
+      setError('Please pick an available time slot.');
+      return;
+    }
+    if (!reason.trim()) {
+      setError('Please describe your medical reason or symptoms for the visit.');
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      const combinedDateTime = new Date(`${appointmentDate}T${selectedTimeSlot}:00`);
+
+      const payload = {
+        doctorId: selectedDoctorId,
+        appointmentDate: combinedDateTime.toISOString(),
+        reason: reason.trim(),
+      };
+
+      const res = await bookAppointment(payload);
+      setSuccessData(res.appointment || { ...payload, doctor: selectedDoctor });
+    } catch (err) {
+      console.error('Error booking appointment:', err);
+      setError(getErrorMessage(err));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Minimum date for date picker: tomorrow or today
+  const minDate = new Date().toISOString().split('T')[0];
+
+  if (loadingDepts) {
+    return <LoadingSpinner size="lg" text="Loading hospital departments..." />;
+  }
+
+  // Render Confirmation view after successful booking
+  if (successData) {
+    return (
+      <div className="max-w-2xl mx-auto py-8">
+        <Card className="border-emerald-200 shadow-md">
+          <div className="p-8 text-center">
+            <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <IoCheckmarkCircle className="w-10 h-10" />
+            </div>
+            <h2 className="text-2xl font-bold text-slate-900">Appointment Booked Successfully!</h2>
+            <p className="text-sm text-slate-600 mt-2">
+              Your appointment request has been recorded. The clinic will review and confirm your
+              slot shortly.
+            </p>
+
+            <div className="mt-6 bg-slate-50 border border-slate-200 rounded-xl p-5 text-left space-y-3">
+              <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+                <span className="text-xs font-semibold uppercase text-slate-500">Status</span>
+                <Badge status={successData.status || 'pending'} />
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-slate-500">Doctor</span>
+                <span className="text-sm font-semibold text-slate-900">
+                  Dr. {selectedDoctor?.userId?.name || selectedDoctor?.name || 'Doctor'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-slate-500">Specialization</span>
+                <span className="text-sm text-slate-700">{selectedDoctor?.specialization}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-slate-500">Scheduled Date & Time</span>
+                <span className="text-sm font-semibold text-blue-700">
+                  {appointmentDate} at {selectedTimeSlot}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-slate-500">Consultation Fee</span>
+                <span className="text-sm font-bold text-slate-900">
+                  ${selectedDoctor?.consultationFee}
+                </span>
+              </div>
+              {successData.queueNumber && (
+                <div className="flex justify-between items-center pt-2 border-t border-slate-200">
+                  <span className="text-sm text-slate-500">Queue Number</span>
+                  <span className="text-sm font-bold text-emerald-700">
+                    #{successData.queueNumber}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
+              <Button
+                variant="primary"
+                onClick={() => navigate('/patient/appointments')}
+                icon={IoCalendarOutline}
+              >
+                View My Appointments
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSuccessData(null);
+                  setSelectedDepartment('');
+                  setSelectedDoctorId('');
+                  setAppointmentDate('');
+                  setSelectedTimeSlot('');
+                  setReason('');
+                }}
+              >
+                Book Another
+              </Button>
+            </div>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-3xl mx-auto space-y-6">
+      {/* Title */}
+      <div>
+        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Book an Appointment</h1>
+        <p className="text-sm text-slate-500 mt-1">
+          Select department, choose your preferred physician, and reserve an available appointment
+          slot.
+        </p>
+      </div>
+
+      {error && <Alert type="error" message={error} onClose={() => setError('')} />}
+
+      <Card>
+        <CardContent className="p-6 sm:p-8">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Step 1: Department */}
+            <div>
+              <Select
+                label="1. Medical Department"
+                name="department"
+                value={selectedDepartment}
+                onChange={(e) => setSelectedDepartment(e.target.value)}
+                required
+                placeholder="-- Select Department --"
+              >
+                {departments.map((dept) => (
+                  <option key={dept._id} value={dept._id}>
+                    {dept.name} {dept.location ? `(${dept.location})` : ''}
+                  </option>
+                ))}
+              </Select>
+            </div>
+
+            {/* Step 2: Doctor */}
+            {selectedDepartment && (
+              <div>
+                <Select
+                  label="2. Choose Doctor"
+                  name="doctor"
+                  value={selectedDoctorId}
+                  onChange={(e) => setSelectedDoctorId(e.target.value)}
+                  required
+                  disabled={loadingDocs}
+                  placeholder={
+                    loadingDocs ? 'Loading available doctors...' : '-- Select Doctor --'
+                  }
+                >
+                  {doctors.map((doc) => (
+                    <option key={doc._id} value={doc._id}>
+                      Dr. {doc.userId?.name || doc.name} - {doc.specialization} (
+                      {doc.experience} yrs exp)
+                    </option>
+                  ))}
+                </Select>
+                {doctors.length === 0 && !loadingDocs && (
+                  <p className="text-xs text-amber-600 mt-1">
+                    No active doctors available in this department right now.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Step 3: Doctor Details Card */}
+            {selectedDoctor && (
+              <div className="p-4 rounded-xl bg-blue-50/70 border border-blue-200/80 space-y-2 animate-fade-in text-sm text-left">
+                <div className="flex items-center gap-2 font-semibold text-blue-950">
+                  <IoPersonOutline className="text-blue-700 w-5 h-5" />
+                  Dr. {selectedDoctor.userId?.name || selectedDoctor.name}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-slate-700 pt-1">
+                  <div>
+                    <span className="font-semibold text-slate-900">Qualification: </span>
+                    {selectedDoctor.qualification}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <IoCashOutline className="text-slate-500" />
+                    <span className="font-semibold text-slate-900">Fee: </span>$
+                    {selectedDoctor.consultationFee}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <IoTimeOutline className="text-slate-500" />
+                    <span className="font-semibold text-slate-900">Hours: </span>
+                    {selectedDoctor.availableTime?.start} - {selectedDoctor.availableTime?.end}
+                  </div>
+                </div>
+                <div className="text-xs text-slate-600 pt-1 border-t border-blue-200/60">
+                  <span className="font-semibold text-slate-900">Available Days: </span>
+                  {selectedDoctor.availableDays?.length > 0
+                    ? selectedDoctor.availableDays.join(', ')
+                    : 'All days'}
+                </div>
+              </div>
+            )}
+
+            {/* Step 4: Date */}
+            {selectedDoctor && (
+              <div>
+                <Input
+                  label="3. Appointment Date"
+                  type="date"
+                  min={minDate}
+                  value={appointmentDate}
+                  onChange={handleDateChange}
+                  required
+                  icon={IoCalendarOutline}
+                  helperText={
+                    selectedDoctor.availableDays?.length
+                      ? `Doctor available on: ${selectedDoctor.availableDays.join(', ')}`
+                      : 'Select any future day'
+                  }
+                />
+              </div>
+            )}
+
+            {/* Step 5: Time Slots */}
+            {appointmentDate && timeSlots.length > 0 && (
+              <div>
+                <label className="text-sm font-medium text-slate-700 block mb-2 text-left">
+                  4. Available Time Slots <span className="text-red-500">*</span>
+                </label>
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                  {timeSlots.map((slot) => {
+                    const isSelected = selectedTimeSlot === slot;
+                    return (
+                      <button
+                        type="button"
+                        key={slot}
+                        onClick={() => setSelectedTimeSlot(slot)}
+                        className={`py-2 px-3 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                            : 'bg-white text-slate-700 border-slate-200 hover:border-blue-400 hover:bg-blue-50/50'
+                        }`}
+                      >
+                        {slot}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Step 6: Reason */}
+            {selectedDoctor && (
+              <div className="text-left">
+                <label className="text-sm font-medium text-slate-700 block mb-1.5">
+                  5. Reason for Visit / Symptoms <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  rows={3}
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="Please briefly explain what issues you are experiencing..."
+                  required
+                  maxLength={500}
+                  className="w-full rounded-lg border border-slate-300 p-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                />
+                <span className="text-xs text-slate-400 block text-right mt-1">
+                  {reason.length}/500 characters
+                </span>
+              </div>
+            )}
+
+            {/* Submit */}
+            <div className="pt-4 border-t border-slate-100 flex justify-end">
+              <Button
+                type="submit"
+                variant="primary"
+                size="lg"
+                isLoading={submitting}
+                icon={IoArrowForward}
+              >
+                Confirm Appointment Booking
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default BookAppointment;

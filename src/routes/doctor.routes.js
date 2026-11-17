@@ -1,23 +1,26 @@
-const express =require("express")
+const express = require("express");
 
 const { protect } = require("../middleware/auth.middleware");
 const { authorizeRoles } = require("../middleware/role.middleware");
-const {  createDoctor,
+const {
+  createDoctor,
   getDoctors,
   getDoctorsById,
-  updateDoctor, } = require("../controllers/doctor.Controller");
-
+  updateDoctor,
+} = require("../controllers/doctor.Controller");
 
 const router = express.Router();
 
-router.post(
-  "/",
-  protect,
-  authorizeRoles("admin"),
-  createDoctor
-);
+// Admin creates doctor account + profile in one call
+router.post("/", protect, authorizeRoles("admin"), createDoctor);
+
+// Any authenticated user can list / search doctors
 router.get("/", protect, getDoctors);
-router.get("/", protect, getDoctorsById);
-router.patch("/", protect, updateDoctor);
+
+// Any authenticated user can view a single doctor
+router.get("/:id", protect, getDoctorsById);
+
+// Admin (or the doctor themselves) can update profile
+router.patch("/:id", protect, authorizeRoles("admin", "doctor"), updateDoctor);
 
 module.exports = router;
