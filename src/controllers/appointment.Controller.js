@@ -1,6 +1,12 @@
 const Appointment = require("../models/appointment.model");
 const Doctor = require("../models/doctor.model");
 const mongoose = require("mongoose");
+const {
+  getKolkataWeekday,
+  getKolkataTimeString,
+  getKolkataDayRange,
+  isTimeWithinRange,
+} = require("../utils/timezone");
 
 // Normalize a Date to its 30-minute slot start (e.g. 10:15 -> 10:00:00.000, 10:45 -> 10:30:00.000)
 const normalizeSlotStart = (date) => {
@@ -60,9 +66,13 @@ const bookAppointment = async (req, res) => {
       });
     }
 
-    // Check doctor availability on that day of week
-    const dayName = date.toLocaleDateString("en-US", { weekday: "long" });
+    // Normalize appointmentDate and slotStart to the 30-minute slot boundary
+    const slotStart = normalizeSlotStart(date);
+
+    // Check doctor availability on that day of week in Asia/Kolkata
+    const dayName = getKolkataWeekday(slotStart);
     if (
+      doctor.availableDays &&
       doctor.availableDays.length > 0 &&
       !doctor.availableDays.includes(dayName)
     ) {
@@ -72,8 +82,16 @@ const bookAppointment = async (req, res) => {
       });
     }
 
-    // Normalize appointmentDate and slotStart to the 30-minute slot boundary
-    const slotStart = normalizeSlotStart(date);
+    // Enforce doctor.availableTime start/end in Asia/Kolkata
+    const slotTimeStr = getKolkataTimeString(slotStart);
+    const doctorStartTime = doctor.availableTime?.start || "09:00";
+    const doctorEndTime = doctor.availableTime?.end || "17:00";
+    if (!isTimeWithinRange(slotTimeStr, doctorStartTime, doctorEndTime)) {
+      return res.status(400).json({
+        success: false,
+        message: `Doctor is only available between ${doctorStartTime} and ${doctorEndTime} IST. Selected slot time: ${slotTimeStr}`,
+      });
+    }
 
     const existingAppointment = await Appointment.findOne({
       doctor: doctor._id,
@@ -102,11 +120,8 @@ const bookAppointment = async (req, res) => {
       });
     }
 
-    // Calculate queue number for this doctor on this date
-    const dayStart = new Date(date);
-    dayStart.setHours(0, 0, 0, 0);
-    const dayEnd = new Date(date);
-    dayEnd.setHours(23, 59, 59, 999);
+    // Calculate queue number for this doctor on this date (Asia/Kolkata day boundary)
+    const { start: dayStart, end: dayEnd } = getKolkataDayRange(slotStart);
 
     const appointmentsToday = await Appointment.countDocuments({
       doctor: doctor._id,
@@ -210,11 +225,8 @@ const getDoctorAppointments = async (req, res) => {
     }
 
     if (date) {
-      const dayStart = new Date(date);
+      const { start: dayStart, end: dayEnd } = getKolkataDayRange(date);
       if (!isNaN(dayStart.getTime())) {
-        dayStart.setHours(0, 0, 0, 0);
-        const dayEnd = new Date(dayStart);
-        dayEnd.setHours(23, 59, 59, 999);
         filter.appointmentDate = { $gte: dayStart, $lte: dayEnd };
       }
     }
@@ -249,11 +261,8 @@ const getAllAppointments = async (req, res) => {
     }
 
     if (date) {
-      const dayStart = new Date(date);
+      const { start: dayStart, end: dayEnd } = getKolkataDayRange(date);
       if (!isNaN(dayStart.getTime())) {
-        dayStart.setHours(0, 0, 0, 0);
-        const dayEnd = new Date(dayStart);
-        dayEnd.setHours(23, 59, 59, 999);
         filter.appointmentDate = { $gte: dayStart, $lte: dayEnd };
       }
     }
@@ -461,14 +470,26 @@ const rescheduleAppointment = async (req, res) => {
     // Check availability for the doctor on the new date
     const doctor = await Doctor.findById(appointment.doctor);
     if (doctor) {
-      const dayName = newDate.toLocaleDateString("en-US", { weekday: "long" });
+      const dayName = getKolkataWeekday(newSlotStart);
       if (
+        doctor.availableDays &&
         doctor.availableDays.length > 0 &&
         !doctor.availableDays.includes(dayName)
       ) {
         return res.status(400).json({
           success: false,
           message: `Doctor is not available on ${dayName}`,
+        });
+      }
+
+      // Enforce doctor.availableTime start/end in Asia/Kolkata
+      const slotTimeStr = getKolkataTimeString(newSlotStart);
+      const doctorStartTime = doctor.availableTime?.start || "09:00";
+      const doctorEndTime = doctor.availableTime?.end || "17:00";
+      if (!isTimeWithinRange(slotTimeStr, doctorStartTime, doctorEndTime)) {
+        return res.status(400).json({
+          success: false,
+          message: `Doctor is only available between ${doctorStartTime} and ${doctorEndTime} IST. Selected slot time: ${slotTimeStr}`,
         });
       }
     }
