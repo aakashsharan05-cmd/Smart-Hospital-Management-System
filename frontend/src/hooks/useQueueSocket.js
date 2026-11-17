@@ -57,7 +57,7 @@ export const useQueueSocket = ({ onQueueUpdate, onStatusChange } = {}) => {
       }
     });
 
-    socket.on('appointment:status', (data) => {
+    socket.on('appointment:statusChanged', (data) => {
       setLastStatusChange(data);
       if (statusCallbackRef.current) {
         statusCallbackRef.current(data);
@@ -69,7 +69,7 @@ export const useQueueSocket = ({ onQueueUpdate, onStatusChange } = {}) => {
       socket.off('disconnect');
       socket.off('connect_error');
       socket.off('queue:update');
-      socket.off('appointment:status');
+      socket.off('appointment:statusChanged');
       socket.disconnect();
       socketRef.current = null;
     };

@@ -13,11 +13,15 @@ const {
 const { getNextQueueNumber } = require("../utils/counter");
 const {
   validateStatusTransition,
+  updateAppointmentStatusService,
+  checkInAppointmentService,
+  startConsultationService,
+  endConsultationService,
+  cancelAppointmentService,
+  rescheduleAppointmentService,
+  createWalkInAppointmentService,
+  bookAppointmentService,
 } = require("../services/appointmentStatus.service");
-const {
-  emitAppointmentStatusChanged,
-  emitQueueUpdate,
-} = require("../services/socket.service");
 
 // Normalize a Date to its 30-minute slot start (e.g. 10:15 -> 10:00:00.000, 10:45 -> 10:30:00.000)
 const normalizeSlotStart = (date) => {
@@ -146,17 +150,8 @@ const bookAppointment = async (req, res) => {
       queueNumber,
     });
 
-    // Populate for response
-    const populated = await Appointment.findById(appointment._id)
-      .populate("patient", "name email phone")
-      .populate({
-        path: "doctor",
-        select: "specialization consultationFee userId",
-        populate: { path: "userId", select: "name" },
-      })
-      .populate("department", "name");
-
-    emitAppointmentStatusChanged(populated);
+    // Delegate to service for population and status changed emission
+    const populated = await bookAppointmentService(appointment);
 
     return res.status(201).json({
       success: true,
@@ -401,19 +396,15 @@ const cancelAppointment = async (req, res) => {
     }
 
     const { cancellationReason } = req.body;
-
-    appointment.status = "cancelled";
-    appointment.cancellationReason =
-      cancellationReason?.trim() || "Cancelled by user";
-    await appointment.save();
-
-    emitAppointmentStatusChanged(appointment);
-    emitQueueUpdate(appointment.doctor);
+    const updated = await cancelAppointmentService({
+      appointmentId: id,
+      cancellationReason,
+    });
 
     return res.status(200).json({
       success: true,
       message: "Appointment cancelled successfully",
-      appointment,
+      appointment: updated,
     });
   } catch (error) {
     console.error("Cancel appointment error:", error.message);
@@ -522,19 +513,15 @@ const rescheduleAppointment = async (req, res) => {
       });
     }
 
-    appointment.appointmentDate = newSlotStart;
-    appointment.slotStart = newSlotStart;
-    appointment.isSlotActive = true;
-    appointment.status = "pending"; // Reset to pending after reschedule
-    await appointment.save();
-
-    emitAppointmentStatusChanged(appointment);
-    emitQueueUpdate(appointment.doctor);
+    const updated = await rescheduleAppointmentService({
+      appointment,
+      newSlotStart,
+    });
 
     return res.status(200).json({
       success: true,
       message: "Appointment rescheduled successfully",
-      appointment,
+      appointment: updated,
     });
   } catch (error) {
     console.error("Reschedule appointment error:", error.message);
@@ -601,19 +588,16 @@ const updateAppointmentStatus = async (req, res) => {
       }
     }
 
-    appointment.status = status;
-    if (notes) {
-      appointment.notes = notes.trim();
-    }
-    await appointment.save();
-
-    emitAppointmentStatusChanged(appointment);
-    emitQueueUpdate(appointment.doctor);
+    const updated = await updateAppointmentStatusService({
+      appointmentId: id,
+      targetStatus: status,
+      notes,
+    });
 
     return res.status(200).json({
       success: true,
       message: `Appointment ${status} successfully`,
-      appointment,
+      appointment: updated,
     });
   } catch (error) {
     console.error("Update appointment status error:", error.message);
@@ -626,7 +610,6 @@ const updateAppointmentStatus = async (req, res) => {
 
 // ── Walk-in appointment registration (Receptionist/Admin) ─
 const createWalkInAppointment = async (req, res) => {
-  const session = await mongoose.startSession();
   try {
     const { patientId, patient, doctorId, reason } = req.body;
 
@@ -644,131 +627,16 @@ const createWalkInAppointment = async (req, res) => {
       });
     }
 
-    const doctor = await Doctor.findById(doctorId);
-    if (!doctor || !doctor.isAvailable) {
-      return res.status(400).json({
-        success: false,
-        message: "Doctor not found or currently unavailable",
-      });
-    }
-
-    let resolvedPatientId = null;
-
-    if (patientId) {
-      if (!mongoose.isValidObjectId(patientId)) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid patientId format",
-        });
-      }
-      const existingUser = await User.findById(patientId);
-      if (!existingUser) {
-        return res.status(404).json({
-          success: false,
-          message: "Patient not found with provided ID",
-        });
-      }
-      resolvedPatientId = existingUser._id;
-    } else if (patient && typeof patient === "object") {
-      const { name, phone, email } = patient;
-      if (!name || !name.trim()) {
-        return res.status(400).json({
-          success: false,
-          message: "Patient name is required",
-        });
-      }
-      if (!phone || !phone.trim()) {
-        return res.status(400).json({
-          success: false,
-          message: "Patient phone is required",
-        });
-      }
-
-      const trimmedPhone = phone.trim();
-
-      // B2 requirement: Find existing patient by phone BEFORE creating new user (no duplicates)
-      const existingByPhone = await User.findOne({ phone: trimmedPhone });
-      if (existingByPhone) {
-        resolvedPatientId = existingByPhone._id;
-      } else {
-        // Generate non-routable placeholder email if email not provided
-        let patientEmail = email?.trim().toLowerCase();
-        if (!patientEmail) {
-          const cleanPhone = trimmedPhone.replace(/[^0-9]/g, "");
-          const randomSuffix = crypto.randomBytes(4).toString("hex");
-          patientEmail = `walkin-${cleanPhone || "user"}-${randomSuffix}@hospital.local`;
-        } else {
-          const existingByEmail = await User.findOne({ email: patientEmail });
-          if (existingByEmail) {
-            return res.status(409).json({
-              success: false,
-              message: "A user with this email already exists",
-            });
-          }
-        }
-
-        // B2 requirement: Random crypto.randomBytes value, hashed, never shown or logged
-        const randomPassword = crypto.randomBytes(24).toString("hex");
-        const hashedPassword = await bcrypt.hash(randomPassword, 10);
-
-        let createdUser;
-        await session.withTransaction(async () => {
-          const [newUser] = await User.create(
-            [
-              {
-                name: name.trim(),
-                email: patientEmail,
-                password: hashedPassword,
-                phone: trimmedPhone,
-                role: "patient",
-                isActive: true,
-              },
-            ],
-            { session }
-          );
-          createdUser = newUser;
-        });
-        resolvedPatientId = createdUser._id;
-      }
-    } else {
-      return res.status(400).json({
-        success: false,
-        message: "Either patientId or patient { name, phone } must be provided",
-      });
-    }
-
     const now = new Date();
     const slotStart = normalizeSlotStart(now);
 
-    // Atomic queue number for today
-    const queueNumber = await getNextQueueNumber(doctor._id, slotStart);
-
-    const appointment = await Appointment.create({
-      patient: resolvedPatientId,
-      doctor: doctor._id,
-      department: doctor.department,
-      appointmentDate: slotStart,
+    const populated = await createWalkInAppointmentService({
+      patientId,
+      patient,
+      doctorId,
+      reason,
       slotStart,
-      appointmentType: "walk-in",
-      status: "in-queue",
-      checkInTime: now,
-      isSlotActive: false,
-      reason: reason.trim(),
-      symptomText: reason.trim(),
-      queueNumber,
     });
-
-    const populated = await Appointment.findById(appointment._id)
-      .populate("patient", "name email phone")
-      .populate({
-        path: "doctor",
-        select: "specialization consultationFee userId",
-        populate: { path: "userId", select: "name email phone" },
-      })
-      .populate("department", "name");
-
-    emitAppointmentStatusChanged(populated);
-    emitQueueUpdate(doctor._id);
 
     return res.status(201).json({
       success: true,
@@ -777,12 +645,10 @@ const createWalkInAppointment = async (req, res) => {
     });
   } catch (error) {
     console.error("Create walk-in error:", error.message);
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       success: false,
       message: error.message || "Failed to create walk-in appointment",
     });
-  } finally {
-    await session.endSession();
   }
 };
 
@@ -797,38 +663,7 @@ const checkInAppointment = async (req, res) => {
       });
     }
 
-    const appointment = await Appointment.findById(id);
-    if (!appointment) {
-      return res.status(404).json({
-        success: false,
-        message: "Appointment not found",
-      });
-    }
-
-    // Validate transition: confirmed -> in-queue
-    const check = validateStatusTransition(appointment.status, "in-queue");
-    if (!check.allowed) {
-      return res.status(400).json({
-        success: false,
-        message: check.message,
-      });
-    }
-
-    appointment.status = "in-queue";
-    appointment.checkInTime = new Date();
-    await appointment.save();
-
-    const populated = await Appointment.findById(appointment._id)
-      .populate("patient", "name email phone")
-      .populate({
-        path: "doctor",
-        select: "specialization userId",
-        populate: { path: "userId", select: "name" },
-      })
-      .populate("department", "name");
-
-    emitAppointmentStatusChanged(populated);
-    emitQueueUpdate(appointment.doctor);
+    const populated = await checkInAppointmentService(id);
 
     return res.status(200).json({
       success: true,
@@ -837,9 +672,9 @@ const checkInAppointment = async (req, res) => {
     });
   } catch (error) {
     console.error("Check-in error:", error.message);
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       success: false,
-      message: "Server error during check-in",
+      message: error.message || "Server error during check-in",
     });
   }
 };
@@ -855,46 +690,18 @@ const startConsultation = async (req, res) => {
       });
     }
 
-    const appointment = await Appointment.findById(id);
-    if (!appointment) {
-      return res.status(404).json({
-        success: false,
-        message: "Appointment not found",
-      });
-    }
-
     const doctor = await Doctor.findOne({ userId: req.user.userId });
-    if (!doctor || appointment.doctor.toString() !== doctor._id.toString()) {
+    if (!doctor) {
       return res.status(403).json({
         success: false,
-        message: "You can only start consultations for your own appointments",
+        message: "Doctor profile not found",
       });
     }
 
-    // Validate transition: in-queue -> in-consultation
-    const check = validateStatusTransition(appointment.status, "in-consultation");
-    if (!check.allowed) {
-      return res.status(400).json({
-        success: false,
-        message: check.message,
-      });
-    }
-
-    appointment.status = "in-consultation";
-    appointment.consultationStartTime = new Date();
-    await appointment.save();
-
-    const populated = await Appointment.findById(appointment._id)
-      .populate("patient", "name email phone")
-      .populate({
-        path: "doctor",
-        select: "specialization userId",
-        populate: { path: "userId", select: "name" },
-      })
-      .populate("department", "name");
-
-    emitAppointmentStatusChanged(populated);
-    emitQueueUpdate(appointment.doctor);
+    const populated = await startConsultationService({
+      appointmentId: id,
+      doctorProfileId: doctor._id,
+    });
 
     return res.status(200).json({
       success: true,
@@ -903,9 +710,9 @@ const startConsultation = async (req, res) => {
     });
   } catch (error) {
     console.error("Start consultation error:", error.message);
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       success: false,
-      message: "Server error during starting consultation",
+      message: error.message || "Server error during starting consultation",
     });
   }
 };
@@ -921,46 +728,20 @@ const endConsultation = async (req, res) => {
       });
     }
 
-    const appointment = await Appointment.findById(id);
-    if (!appointment) {
-      return res.status(404).json({
-        success: false,
-        message: "Appointment not found",
-      });
-    }
-
     const doctor = await Doctor.findOne({ userId: req.user.userId });
-    if (!doctor || appointment.doctor.toString() !== doctor._id.toString()) {
+    if (!doctor) {
       return res.status(403).json({
         success: false,
-        message: "You can only complete consultations for your own appointments",
+        message: "Doctor profile not found",
       });
     }
 
-    // Validate transition: in-consultation -> completed
-    const check = validateStatusTransition(appointment.status, "completed");
-    if (!check.allowed) {
-      return res.status(400).json({
-        success: false,
-        message: check.message,
-      });
-    }
-
-    appointment.status = "completed";
-    appointment.consultationEndTime = new Date();
-    await appointment.save();
-
-    const populated = await Appointment.findById(appointment._id)
-      .populate("patient", "name email phone")
-      .populate({
-        path: "doctor",
-        select: "specialization userId",
-        populate: { path: "userId", select: "name" },
-      })
-      .populate("department", "name");
-
-    emitAppointmentStatusChanged(populated);
-    emitQueueUpdate(appointment.doctor);
+    const { consultationNotes } = req.body;
+    const populated = await endConsultationService({
+      appointmentId: id,
+      doctorProfileId: doctor._id,
+      consultationNotes,
+    });
 
     return res.status(200).json({
       success: true,
@@ -969,9 +750,9 @@ const endConsultation = async (req, res) => {
     });
   } catch (error) {
     console.error("End consultation error:", error.message);
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       success: false,
-      message: "Server error during completing consultation",
+      message: error.message || "Server error during completing consultation",
     });
   }
 };

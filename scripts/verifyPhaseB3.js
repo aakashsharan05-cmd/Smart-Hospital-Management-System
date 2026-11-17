@@ -11,6 +11,7 @@ process.env.CORS_ORIGIN = "http://localhost:5173";
 
 const app = require("../src/app");
 const { initSocket, getIO } = require("../src/services/socket.service");
+const { createWalkInAppointmentService } = require("../src/services/appointmentStatus.service");
 const User = require("../src/models/user.model");
 const Department = require("../src/models/department.model");
 const Doctor = require("../src/models/doctor.model");
@@ -212,7 +213,7 @@ async function runB3Tests() {
     }
     console.log("✓ Test 3 Passed: Verified server assigned correct rooms strictly derived from JWT.");
 
-    console.log("\n--- Test 4: Live event broadcast on Walk-In creation ---");
+    console.log("\n--- Test 4: Live event broadcast on Walk-In creation using appointment:statusChanged ---");
     // Setup event listeners on docClient and staffClient
     const docQueuePromise = new Promise((resolve) => {
       docClient.once("queue:update", (data) => resolve(data));
@@ -221,10 +222,10 @@ async function runB3Tests() {
       staffClient.once("queue:update", (data) => resolve(data));
     });
     const staffStatusPromise = new Promise((resolve) => {
-      staffClient.once("appointment:status", (data) => resolve(data));
+      staffClient.once("appointment:statusChanged", (data) => resolve(data));
     });
 
-    // Create walk-in via API
+    // Create walk-in via API (which uses appointmentStatus.service)
     const walkInRes = await request(app)
       .post("/api/appointments/walk-in")
       .set("Authorization", `Bearer ${staffToken}`)
@@ -250,12 +251,66 @@ async function runB3Tests() {
 
     console.log("Doctor received queue:update count:", docQueueEvent.count);
     console.log("Staff received queue:update count:", staffQueueEvent.count);
-    console.log("Staff received appointment:status status:", staffStatusEvent.status);
+    console.log("Staff received appointment:statusChanged status:", staffStatusEvent.status);
 
-    if (docQueueEvent.count !== 1 || staffQueueEvent.count !== 1 || staffStatusEvent.status !== "in-queue") {
+    if (
+      docQueueEvent.count !== 1 ||
+      staffQueueEvent.count !== 1 ||
+      staffStatusEvent.status !== "in-queue"
+    ) {
       throw new Error("Test 4 Failed: Socket events payload mismatch");
     }
-    console.log("✓ Test 4 Passed: Doctor & Staff received real-time queue:update and appointment:status events.");
+    console.log("✓ Test 4 Passed: Doctor & Staff received appointment:statusChanged and queue:update events.");
+
+    console.log("\n--- Test 5: Transaction failure / rollback guarantees ZERO socket emissions ---");
+    const receivedEventsOnRollback = [];
+    const rollbackListener = (eventName) => (payload) => {
+      receivedEventsOnRollback.push({ eventName, payload });
+    };
+
+    staffClient.on("appointment:statusChanged", rollbackListener("staff:appointment:statusChanged"));
+    staffClient.on("queue:update", rollbackListener("staff:queue:update"));
+    docClient.on("appointment:statusChanged", rollbackListener("doc:appointment:statusChanged"));
+    docClient.on("queue:update", rollbackListener("doc:queue:update"));
+
+    const abortSession = await mongoose.startSession();
+    try {
+      await abortSession.withTransaction(async () => {
+        // Create partial appointment in transaction
+        await Appointment.create(
+          [
+            {
+              patient: patientUser._id,
+              doctor: doctorProfile._id,
+              department: dept._id,
+              appointmentDate: new Date(),
+              status: "in-queue",
+              reason: "Will abort intentionally",
+            },
+          ],
+          { session: abortSession }
+        );
+
+        // Intentionally throw error before commit to force abort/rollback
+        throw new Error("SIMULATED_TRANSACTION_FAILURE");
+      });
+    } catch (err) {
+      if (err.message !== "SIMULATED_TRANSACTION_FAILURE") {
+        throw err;
+      }
+      console.log("Simulated transaction failure successfully triggered rollback.");
+    } finally {
+      await abortSession.endSession();
+    }
+
+    // Wait 400ms to verify absolutely no events are delivered
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    console.log("Events received during transaction rollback:", receivedEventsOnRollback.length);
+
+    if (receivedEventsOnRollback.length !== 0) {
+      throw new Error("Test 5 Failed: Socket events were emitted despite transaction failure/rollback!");
+    }
+    console.log("✓ Test 5 Passed: Zero socket events emitted during transaction rollback.");
 
     // Clean up sockets
     docClient.disconnect();

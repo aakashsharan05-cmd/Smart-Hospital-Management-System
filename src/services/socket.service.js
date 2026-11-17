@@ -108,12 +108,12 @@ const emitAppointmentStatusChanged = async (appointment) => {
     };
 
     if (patientId) {
-      io.to(`patient:${patientId}`).emit("appointment:status", payload);
+      io.to(`patient:${patientId}`).emit("appointment:statusChanged", payload);
     }
     if (doctorId) {
-      io.to(`doctor:${doctorId}`).emit("appointment:status", payload);
+      io.to(`doctor:${doctorId}`).emit("appointment:statusChanged", payload);
     }
-    io.to("staff").emit("appointment:status", payload);
+    io.to("staff").emit("appointment:statusChanged", payload);
   } catch (err) {
     console.error("Socket emitAppointmentStatusChanged error:", err.message);
   }
