@@ -86,48 +86,64 @@ const createDoctor = async (req, res) => {
     // 4. Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // 5. Create User account
-    const user = await User.create({
-      name: name.trim(),
-      email: normalizedEmail,
-      password: hashedPassword,
-      phone,
-      role: "doctor",
-    });
+    // 5. Create User account and Doctor profile atomically via transaction
+    const session = await mongoose.startSession();
+    let createdDoctor;
+    let createdUser;
 
     try {
-      // 6. Create Doctor profile
-      const doctor = await Doctor.create({
-        userId: user._id,
-        specialization: specialization.trim(),
-        qualification: qualification.trim(),
-        experience: Number(experience),
-        consultationFee: Number(consultationFee),
-        department: existingDepartment._id,
-        availableDays: availableDays || [],
-      });
+      await session.withTransaction(async () => {
+        const [user] = await User.create(
+          [
+            {
+              name: name.trim(),
+              email: normalizedEmail,
+              password: hashedPassword,
+              phone,
+              role: "doctor",
+            },
+          ],
+          { session }
+        );
 
-      return res.status(201).json({
-        success: true,
-        message: "Doctor created successfully",
-        doctor: {
-          _id: doctor._id,
-          userId: user._id,
-          name: user.name,
-          email: user.email,
-          specialization: doctor.specialization,
-          qualification: doctor.qualification,
-          experience: doctor.experience,
-          consultationFee: doctor.consultationFee,
-          department: doctor.department,
-          availableDays: doctor.availableDays,
-        },
+        const [doctor] = await Doctor.create(
+          [
+            {
+              userId: user._id,
+              specialization: specialization.trim(),
+              qualification: qualification.trim(),
+              experience: Number(experience),
+              consultationFee: Number(consultationFee),
+              department: existingDepartment._id,
+              availableDays: availableDays || [],
+            },
+          ],
+          { session }
+        );
+
+        createdUser = user;
+        createdDoctor = doctor;
       });
-    } catch (error) {
-      // Remove User if Doctor profile creation fails
-      await User.findByIdAndDelete(user._id);
-      throw error;
+    } finally {
+      await session.endSession();
     }
+
+    return res.status(201).json({
+      success: true,
+      message: "Doctor created successfully",
+      doctor: {
+        _id: createdDoctor._id,
+        userId: createdUser._id,
+        name: createdUser.name,
+        email: createdUser.email,
+        specialization: createdDoctor.specialization,
+        qualification: createdDoctor.qualification,
+        experience: createdDoctor.experience,
+        consultationFee: createdDoctor.consultationFee,
+        department: createdDoctor.department,
+        availableDays: createdDoctor.availableDays,
+      },
+    });
   } catch (error) {
     console.error("Create doctor error:", error);
 
