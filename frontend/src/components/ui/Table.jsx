@@ -3,7 +3,7 @@ import LoadingSpinner from '../LoadingSpinner';
 
 export const TableContainer = ({ children, className = '' }) => {
   return (
-    <div className={`w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs ${className}`}>
+    <div className={`w-full overflow-hidden rounded-xl border border-[#E2EAE5] bg-white shadow-xs ${className}`}>
       <div className="overflow-x-auto">{children}</div>
     </div>
   );
@@ -11,7 +11,7 @@ export const TableContainer = ({ children, className = '' }) => {
 
 export const Table = ({ children, className = '' }) => {
   return (
-    <table className={`w-full text-left border-collapse text-sm text-slate-600 ${className}`}>
+    <table className={`w-full text-left border-collapse text-sm text-[#11261F] ${className}`}>
       {children}
     </table>
   );
@@ -19,7 +19,7 @@ export const Table = ({ children, className = '' }) => {
 
 export const TableHead = ({ children, className = '' }) => {
   return (
-    <thead className={`bg-slate-50/80 text-xs font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-200 ${className}`}>
+    <thead className={`bg-[#F4F7F5] text-xs font-semibold uppercase tracking-wider text-[#526B62] border-b border-[#E2EAE5] ${className}`}>
       {children}
     </thead>
   );
@@ -29,7 +29,7 @@ export const TableRow = ({ children, className = '', onClick }) => {
   return (
     <tr
       onClick={onClick}
-      className={`border-b border-slate-100 last:border-0 hover:bg-slate-50/80 transition-colors ${
+      className={`border-b border-[#EEF3F0] last:border-0 hover:bg-[#F8FAF7] transition-colors ${
         onClick ? 'cursor-pointer' : ''
       } ${className}`}
     >
@@ -40,7 +40,7 @@ export const TableRow = ({ children, className = '', onClick }) => {
 
 export const TableHeader = ({ children, className = '' }) => {
   return (
-    <th scope="col" className={`px-4 py-3.5 text-left font-semibold text-slate-600 ${className}`}>
+    <th scope="col" className={`px-4 py-3.5 text-left font-semibold text-[#11261F] ${className}`}>
       {children}
     </th>
   );
@@ -48,7 +48,7 @@ export const TableHeader = ({ children, className = '' }) => {
 
 export const TableCell = ({ children, className = '', colSpan }) => {
   return (
-    <td colSpan={colSpan} className={`px-4 py-3.5 align-middle text-slate-700 ${className}`}>
+    <td colSpan={colSpan} className={`px-4 py-3.5 align-middle text-[#11261F] ${className}`}>
       {children}
     </td>
   );

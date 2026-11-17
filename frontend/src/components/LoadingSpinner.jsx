@@ -10,9 +10,9 @@ const LoadingSpinner = ({ size = 'md', text = 'Loading...', fullScreen = false }
   const spinner = (
     <div className="flex flex-col items-center justify-center gap-3">
       <div
-        className={`${sizeClasses[size] || sizeClasses.md} border-blue-200 border-t-blue-600 rounded-full animate-spin`}
+        className={`${sizeClasses[size] || sizeClasses.md} border-[#C6E7D5] border-t-[#0E382C] rounded-full animate-spin`}
       />
-      {text && <span className="text-sm font-medium text-slate-500">{text}</span>}
+      {text && <span className="text-sm font-medium text-[#526B62]">{text}</span>}
     </div>
   );
 

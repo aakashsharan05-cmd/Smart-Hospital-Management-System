@@ -517,7 +517,7 @@ const ManageDoctors = () => {
                     onClick={() => handleDayToggle(day)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
                       checked
-                        ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                        ? 'bg-[#0E382C] text-[#E5B229] border-[#0E382C] font-bold shadow-xs'
                         : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400'
                     }`}
                   >

@@ -174,8 +174,8 @@ const MyAppointments = () => {
             onClick={() => setActiveTab(tab.key)}
             className={`pb-3 text-sm font-semibold transition-colors border-b-2 -mb-px cursor-pointer ${
               activeTab === tab.key
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
+                ? 'border-[#0E382C] text-[#0E382C] font-bold'
+                : 'border-transparent text-[#526B62] hover:text-[#0E382C]'
             }`}
           >
             {tab.label}

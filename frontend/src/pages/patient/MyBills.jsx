@@ -133,7 +133,7 @@ const MyBills = () => {
 
                 return (
                   <TableRow key={bill._id}>
-                    <TableCell className="font-mono font-bold text-blue-700">
+                    <TableCell className="font-mono font-bold text-[#0E382C]">
                       {bill.invoiceNumber || bill._id.slice(-6).toUpperCase()}
                     </TableCell>
                     <TableCell>

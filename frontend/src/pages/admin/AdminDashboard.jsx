@@ -75,15 +75,15 @@ const AdminDashboard = () => {
   return (
     <div className="space-y-6">
       {/* Top Banner */}
-      <div className="bg-linear-to-r from-slate-900 via-blue-900 to-indigo-950 rounded-2xl p-6 sm:p-8 text-white shadow-md flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="bg-linear-to-r from-[#0E382C] via-[#124637] to-[#175241] rounded-2xl p-6 sm:p-8 text-white shadow-md flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border border-[#164638]">
         <div>
-          <span className="text-xs font-semibold tracking-wider uppercase text-blue-300 flex items-center gap-1.5">
+          <span className="text-xs font-bold tracking-wider uppercase text-[#E5B229] flex items-center gap-1.5">
             <IoSpeedometerOutline /> Hospital Overview
           </span>
           <h1 className="text-2xl sm:text-3xl font-extrabold mt-1 text-white">
             System Administration
           </h1>
-          <p className="text-slate-300 text-sm mt-1 max-w-xl">
+          <p className="text-emerald-100/90 text-sm mt-1 max-w-xl">
             Monitor healthcare staff, hospital departments, user registrations, billing, and system activity.
           </p>
         </div>
@@ -153,28 +153,28 @@ const AdminDashboard = () => {
                 desc: 'Add physicians, update schedules & fees',
                 path: '/admin/doctors',
                 icon: IoMedicalOutline,
-                color: 'text-blue-600 bg-blue-50',
+                color: 'text-[#0E382C] bg-[#EDF7F2]',
               },
               {
                 title: 'Manage Departments',
                 desc: 'Organize medical wings & specialties',
                 path: '/admin/departments',
                 icon: IoBusinessOutline,
-                color: 'text-emerald-600 bg-emerald-50',
+                color: 'text-[#B8850C] bg-[#FDF8EB]',
               },
               {
                 title: 'Manage Users & Roles',
                 desc: 'User permissions & active status',
                 path: '/admin/users',
                 icon: IoPeopleOutline,
-                color: 'text-purple-600 bg-purple-50',
+                color: 'text-[#13543F] bg-[#E5F3EE]',
               },
               {
                 title: 'Hospital Billing',
                 desc: 'Invoices, settlements & reports',
                 path: '/admin/billing',
                 icon: IoCalendarOutline,
-                color: 'text-amber-600 bg-amber-50',
+                color: 'text-[#9A7412] bg-[#FDF8EB]',
               },
             ].map((item) => {
               const Icon = item.icon;
@@ -182,18 +182,18 @@ const AdminDashboard = () => {
                 <Link
                   key={item.path}
                   to={item.path}
-                  className="flex items-center justify-between p-3.5 rounded-xl border border-slate-200/80 hover:border-blue-400 hover:bg-blue-50/30 transition-all text-left"
+                  className="flex items-center justify-between p-3.5 rounded-xl border border-[#E2EAE5] hover:border-[#0E382C] hover:bg-[#EDF7F2]/60 transition-all text-left"
                 >
                   <div className="flex items-center gap-3">
                     <div className={`p-2.5 rounded-lg ${item.color}`}>
                       <Icon className="w-5 h-5" />
                     </div>
                     <div>
-                      <h4 className="text-sm font-semibold text-slate-900">{item.title}</h4>
-                      <p className="text-xs text-slate-500">{item.desc}</p>
+                      <h4 className="text-sm font-semibold text-[#11261F]">{item.title}</h4>
+                      <p className="text-xs text-[#526B62]">{item.desc}</p>
                     </div>
                   </div>
-                  <IoArrowForwardOutline className="w-4 h-4 text-slate-400" />
+                  <IoArrowForwardOutline className="w-4 h-4 text-[#526B62]" />
                 </Link>
               );
             })}
@@ -205,11 +205,11 @@ const AdminDashboard = () => {
           <CardHeader>
             <div>
               <CardTitle>Recent Appointment Activity</CardTitle>
-              <p className="text-xs text-slate-500">Latest consultations booked across all wards</p>
+              <p className="text-xs text-[#526B62]">Latest consultations booked across all wards</p>
             </div>
             <Link
               to="/receptionist/appointments"
-              className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+              className="text-xs font-bold text-[#0E382C] hover:text-[#164638] flex items-center gap-1 hover:underline"
             >
               View Full Logs <IoArrowForwardOutline className="w-3.5 h-3.5" />
             </Link>

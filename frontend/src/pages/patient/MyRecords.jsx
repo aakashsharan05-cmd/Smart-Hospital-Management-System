@@ -101,22 +101,22 @@ const MyRecords = () => {
               <Card
                 key={record._id}
                 className={`overflow-hidden transition-all duration-200 ${
-                  isExpanded ? 'border-blue-300 ring-2 ring-blue-500/10' : ''
+                  isExpanded ? 'border-[#0E382C]/40 ring-2 ring-[#0E382C]/10' : ''
                 }`}
               >
                 {/* Header click toggles expand */}
                 <div
                   onClick={() => toggleExpand(record._id)}
-                  className="p-5 flex items-center justify-between cursor-pointer hover:bg-slate-50/70 transition-colors select-none"
+                  className="p-5 flex items-center justify-between cursor-pointer hover:bg-[#F8FAF7] transition-colors select-none"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                    <div className="w-11 h-11 rounded-xl bg-[#EDF7F2] text-[#0E382C] flex items-center justify-center shrink-0">
                       <IoDocumentTextOutline className="w-6 h-6" />
                     </div>
                     <div>
-                      <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                      <h3 className="text-base font-bold text-[#11261F] flex items-center gap-2">
                         <span>Diagnosis:</span>
-                        <span className="text-blue-700">{record.diagnosis}</span>
+                        <span className="text-[#0E382C]">{record.diagnosis}</span>
                       </h3>
                       <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1">
                         <span className="flex items-center gap-1">
@@ -157,8 +157,8 @@ const MyRecords = () => {
                   <CardContent className="border-t border-slate-100 bg-slate-50/40 p-6 space-y-6 animate-fade-in">
                     {/* Medicines List */}
                     <div>
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5 mb-3">
-                        <IoMedkitOutline className="w-4 h-4 text-blue-600" /> Prescribed Medicines
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-[#526B62] flex items-center gap-1.5 mb-3">
+                        <IoMedkitOutline className="w-4 h-4 text-[#0E382C]" /> Prescribed Medicines
                       </h4>
                       {record.medicines && record.medicines.length > 0 ? (
                         <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
@@ -209,8 +209,8 @@ const MyRecords = () => {
 
                     {/* Follow up info */}
                     {record.followUpDate && (
-                      <div className="text-xs text-slate-600 flex items-center gap-1.5 pt-2 border-t border-slate-200">
-                        <IoCalendarOutline className="text-blue-600" />
+                      <div className="text-xs text-[#526B62] flex items-center gap-1.5 pt-2 border-t border-[#EEF3F0]">
+                        <IoCalendarOutline className="text-[#0E382C]" />
                         <span className="font-semibold text-slate-900">Recommended Follow-up: </span>
                         {new Date(record.followUpDate).toLocaleDateString(undefined, {
                           month: 'long',

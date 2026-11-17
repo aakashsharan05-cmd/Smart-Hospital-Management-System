@@ -60,41 +60,41 @@ const Sidebar = ({ isOpen, onClose }) => {
       {/* Mobile backdrop */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-slate-900/60 z-40 lg:hidden backdrop-blur-xs"
+          className="fixed inset-0 bg-[#09261E]/70 z-40 lg:hidden backdrop-blur-xs"
           onClick={onClose}
         />
       )}
 
       {/* Sidebar aside */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-40 w-64 bg-slate-900 text-slate-300 flex flex-col transition-transform duration-300 ease-in-out lg:translate-x-0 ${
+        className={`fixed top-0 bottom-0 left-0 z-40 w-64 bg-[#0E382C] text-emerald-100/90 flex flex-col transition-transform duration-300 ease-in-out lg:translate-x-0 border-r border-[#154637] shadow-xl ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         {/* Sidebar Brand Header */}
-        <div className="h-16 flex items-center justify-between px-5 border-b border-slate-800">
+        <div className="h-16 flex items-center justify-between px-5 border-b border-[#154637]">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-black text-sm">
+            <div className="w-8 h-8 rounded-lg bg-[#E5B229] flex items-center justify-center text-[#0E382C] font-black text-sm shadow-xs">
               +
             </div>
             <div className="text-left">
               <span className="text-white font-bold text-base tracking-wide">SHMS PORTAL</span>
-              <p className="text-[10px] text-slate-400 capitalize tracking-wider font-semibold">
+              <p className="text-[10px] text-emerald-200/70 capitalize tracking-wider font-semibold">
                 {role ? `${role} portal` : 'Hospital system'}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+            className="lg:hidden p-1.5 rounded-lg text-emerald-200/70 hover:text-white hover:bg-[#154637] transition-colors cursor-pointer"
           >
             <IoClose className="w-5 h-5" />
           </button>
         </div>
 
         {/* Navigation list */}
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          <div className="px-3 pb-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider text-left">
+        <nav className="flex-1 px-3 py-4 space-y-1.5 overflow-y-auto">
+          <div className="px-3 pb-2 text-[11px] font-semibold text-emerald-300/60 uppercase tracking-wider text-left">
             Navigation
           </div>
           {navLinks.map((item) => {
@@ -107,10 +107,10 @@ const Sidebar = ({ isOpen, onClose }) => {
                   if (window.innerWidth < 1024) onClose();
                 }}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                  `flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
                     isActive
-                      ? 'bg-blue-600 text-white shadow-sm font-semibold'
-                      : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                      ? 'bg-[#E5B229] text-[#0E382C] shadow-md font-bold'
+                      : 'text-emerald-100/80 hover:bg-[#154637] hover:text-white'
                   }`
                 }
               >
@@ -122,10 +122,10 @@ const Sidebar = ({ isOpen, onClose }) => {
         </nav>
 
         {/* Sidebar Footer info */}
-        <div className="p-4 border-t border-slate-800 text-xs text-slate-400 text-left">
-          <div className="bg-slate-800/60 p-3 rounded-lg border border-slate-700/50">
-            <p className="font-medium text-slate-300 truncate">{user?.email}</p>
-            <p className="text-[11px] text-slate-400 capitalize mt-0.5">Role: {user?.role}</p>
+        <div className="p-4 border-t border-[#154637] text-xs text-emerald-200/80 text-left">
+          <div className="bg-[#09261E] p-3 rounded-lg border border-[#164738]">
+            <p className="font-semibold text-white truncate">{user?.email}</p>
+            <p className="text-[11px] text-[#E5B229] font-medium capitalize mt-0.5">Role: {user?.role}</p>
           </div>
         </div>
       </aside>

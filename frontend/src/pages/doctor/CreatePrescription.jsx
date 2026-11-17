@@ -198,9 +198,9 @@ const CreatePrescription = () => {
       {error && <Alert type="error" message={error} onClose={() => setError('')} />}
 
       {/* Appointment Summary Box */}
-      <div className="bg-blue-50/80 border border-blue-200/80 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-left">
+      <div className="bg-[#EDF7F2]/80 border border-[#C6E7D5] rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-left">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold">
+          <div className="w-10 h-10 rounded-full bg-[#0E382C] text-[#E5B229] flex items-center justify-center font-bold">
             <IoPersonOutline className="w-5 h-5" />
           </div>
           <div>
@@ -337,7 +337,7 @@ const CreatePrescription = () => {
                 value={advice}
                 onChange={(e) => setAdvice(e.target.value)}
                 placeholder="e.g., Increase fluid intake, rest for 3 days, avoid cold beverages..."
-                className="w-full rounded-lg border border-slate-300 p-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                className="w-full rounded-lg border border-[#CCD8D1] p-3 text-sm text-[#11261F] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0E382C]/20 focus:border-[#0E382C]"
               />
             </div>
 

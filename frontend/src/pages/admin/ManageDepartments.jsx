@@ -285,7 +285,7 @@ const ManageDepartments = () => {
               value={formData.description}
               onChange={(e) => setFormData((p) => ({ ...p, description: e.target.value }))}
               placeholder="Brief summary of treatments and services offered..."
-              className="w-full rounded-lg border border-slate-300 p-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+              className="w-full rounded-lg border border-[#CCD8D1] p-3 text-sm text-[#11261F] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0E382C]/20 focus:border-[#0E382C]"
             />
           </div>
         </form>

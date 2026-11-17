@@ -7,7 +7,7 @@ const NotFound = () => {
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-white p-8 rounded-2xl border border-slate-200 shadow-lg text-center">
-        <div className="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-4 border border-blue-100">
+        <div className="w-16 h-16 rounded-2xl bg-[#EDF7F2] text-[#0E382C] flex items-center justify-center mx-auto mb-4 border border-[#C6E7D5]">
           <IoCompassOutline className="w-9 h-9" />
         </div>
         <h1 className="text-3xl font-extrabold text-slate-900 mb-1">404</h1>

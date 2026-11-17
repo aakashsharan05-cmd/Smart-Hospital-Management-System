@@ -309,7 +309,7 @@ const ManageAppointments = () => {
                     </TableCell>
                     <TableCell>
                       {appt.queueNumber ? (
-                        <span className="font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
+                        <span className="font-mono font-bold text-[#0E382C] bg-[#EDF7F2] px-2 py-0.5 rounded-md border border-[#C6E7D5]">
                           #{appt.queueNumber}
                         </span>
                       ) : (
@@ -383,7 +383,7 @@ const ManageAppointments = () => {
                           </Button>
                         )}
                         {appt.status === 'in-queue' && (
-                          <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-200">
+                          <span className="text-xs font-bold text-[#9A7412] bg-[#FDF8EB] px-2.5 py-1 rounded-md border border-[#F5DE9B]">
                             In Queue
                           </span>
                         )}
@@ -486,7 +486,7 @@ const ManageAppointments = () => {
             <textarea
               required
               rows={3}
-              className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              className="w-full px-3 py-2 text-sm rounded-lg border border-[#CCD8D1] focus:outline-none focus:ring-2 focus:ring-[#0E382C]/20 focus:border-[#0E382C] transition-all"
               placeholder="e.g. High fever, persistent cough for 2 days"
               value={walkInForm.reason}
               onChange={(e) => setWalkInForm({ ...walkInForm, reason: e.target.value })}

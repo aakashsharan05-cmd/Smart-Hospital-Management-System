@@ -8,22 +8,21 @@ const Badge = ({ status = '', variant, children, className = '' }) => {
       case 'confirmed':
       case 'doctor':
       case 'info':
-        return 'bg-blue-50 text-blue-700 border-blue-200';
+        return 'bg-[#EDF7F2] text-[#0E382C] border-[#C6E7D5]';
       case 'in-queue':
-        return 'bg-indigo-50 text-indigo-700 border-indigo-200';
+        return 'bg-[#FDF8EB] text-[#9A7412] border-[#F5DE9B] font-bold';
       case 'in-consultation':
-        return 'bg-teal-50 text-teal-700 border-teal-200';
+        return 'bg-[#E5F3EE] text-[#13543F] border-[#A8DAC5] font-bold';
       case 'completed':
       case 'paid':
       case 'active':
       case 'success':
-        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+        return 'bg-emerald-50 text-emerald-800 border-emerald-200';
       case 'pending':
-      case 'receptionist':
       case 'warning':
       case 'low stock':
       case 'low-stock':
-        return 'bg-amber-50 text-amber-700 border-amber-200';
+        return 'bg-amber-50 text-amber-800 border-amber-200';
       case 'cancelled':
       case 'rejected':
       case 'missed':
@@ -32,13 +31,15 @@ const Badge = ({ status = '', variant, children, className = '' }) => {
       case 'expired':
         return 'bg-red-50 text-red-700 border-red-200';
       case 'admin':
-        return 'bg-purple-50 text-purple-700 border-purple-200';
+        return 'bg-[#F5F2FC] text-[#5B3E96] border-[#DFD6F5]';
       case 'patient':
-        return 'bg-cyan-50 text-cyan-700 border-cyan-200';
+        return 'bg-[#EDF7F2] text-[#0E382C] border-[#C6E7D5]';
+      case 'receptionist':
+        return 'bg-[#FEF9ED] text-[#8C6709] border-[#F5E2B0]';
       case 'refunded':
       case 'inactive':
       default:
-        return 'bg-slate-100 text-slate-700 border-slate-200';
+        return 'bg-[#F4F7F5] text-[#526B62] border-[#E2EAE5]';
     }
   };
 

@@ -109,23 +109,23 @@ const Register = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#F6F8F5] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
-          <div className="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-lg">
+          <div className="w-14 h-14 rounded-2xl bg-[#0E382C] flex items-center justify-center text-[#E5B229] shadow-lg border border-[#164638]">
             <FaHospitalSymbol className="w-8 h-8" />
           </div>
         </div>
-        <h2 className="mt-4 text-center text-2xl font-bold tracking-tight text-slate-900">
+        <h2 className="mt-4 text-center text-2xl font-bold tracking-tight text-[#11261F]">
           Patient Registration
         </h2>
-        <p className="mt-1 text-center text-sm text-slate-500">
+        <p className="mt-1 text-center text-sm text-[#526B62]">
           Create an account to book appointments and track your health records
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
-        <div className="bg-white py-8 px-6 shadow-xl shadow-slate-200/50 rounded-2xl border border-slate-200/80 sm:px-10">
+        <div className="bg-white py-8 px-6 shadow-xl shadow-[#0E382C]/5 rounded-2xl border border-[#E2EAE5] sm:px-10">
           {serverError && (
             <Alert
               type="error"
@@ -144,7 +144,7 @@ const Register = () => {
               <p className="text-sm text-emerald-700">{successMessage}</p>
               <Link
                 to="/login"
-                className="mt-3 inline-block font-semibold text-sm text-emerald-800 underline hover:text-emerald-900"
+                className="mt-3 inline-block font-bold text-sm text-[#0E382C] underline hover:text-[#164638]"
               >
                 Proceed to Login &rarr;
               </Link>
@@ -230,12 +230,12 @@ const Register = () => {
             </form>
           )}
 
-          <div className="mt-6 pt-6 border-t border-slate-100 text-center">
-            <p className="text-sm text-slate-600">
+          <div className="mt-6 pt-6 border-t border-[#EEF3F0] text-center">
+            <p className="text-sm text-[#526B62]">
               Already have an account?{' '}
               <Link
                 to="/login"
-                className="font-semibold text-blue-600 hover:text-blue-700 transition-colors"
+                className="font-bold text-[#0E382C] hover:text-[#164638] underline-offset-2 hover:underline transition-colors"
               >
                 Sign In
               </Link>

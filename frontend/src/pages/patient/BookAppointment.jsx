@@ -339,7 +339,7 @@ const BookAppointment = () => {
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-slate-500">Scheduled Date & Time</span>
-                <span className="text-sm font-semibold text-blue-700">
+                <span className="text-sm font-bold text-[#0E382C]">
                   {appointmentDate} at {selectedTimeSlot}
                 </span>
               </div>
@@ -363,7 +363,7 @@ const BookAppointment = () => {
                 <div className="pt-3 border-t border-slate-200 text-xs text-slate-700 space-y-1.5">
                   <div className="flex justify-between items-center">
                     <span className="font-semibold text-slate-700 flex items-center gap-1">
-                      <IoSparklesOutline className="text-indigo-600" /> AI Triage Assessment
+                      <IoSparklesOutline className="text-[#0E382C]" /> AI Triage Assessment
                     </span>
                     <span className="font-bold text-slate-900">
                       {successData.aiTriageSuggestion.suggestedDepartment} (
@@ -433,11 +433,11 @@ const BookAppointment = () => {
             {/* Step 1: Reason / Symptoms with AI Triage Assistant */}
             <div className="text-left space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-semibold text-slate-900 block">
+                <label className="text-sm font-semibold text-[#11261F] block">
                   1. Reason for Visit & Symptoms <span className="text-red-500">*</span>
                 </label>
                 {triageLoading && (
-                  <span className="text-xs text-indigo-600 font-medium flex items-center gap-1">
+                  <span className="text-xs text-[#0E382C] font-semibold flex items-center gap-1">
                     <IoSparklesOutline className="animate-spin w-3.5 h-3.5" />
                     AI analyzing symptoms...
                   </span>
@@ -450,17 +450,17 @@ const BookAppointment = () => {
                 placeholder="Describe what symptoms or issues you are experiencing (e.g. persistent headache, chest discomfort, joint pain)..."
                 required
                 maxLength={500}
-                className="w-full rounded-lg border border-slate-300 p-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
+                className="w-full rounded-lg border border-[#CCD8D1] p-3 text-sm text-[#11261F] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0E382C]/20 focus:border-[#0E382C]"
               />
-              <div className="flex justify-between items-center text-xs text-slate-400">
+              <div className="flex justify-between items-center text-xs text-[#526B62]">
                 <span>Real-time AI suggestions activate after 5 characters</span>
                 <span>{reason.length}/500</span>
               </div>
 
               {/* Loading indicator while analyzing */}
               {triageLoading && (
-                <div className="p-3.5 rounded-xl bg-indigo-50/50 border border-indigo-100 flex items-center gap-2 text-xs text-indigo-700 animate-pulse text-left">
-                  <IoSparklesOutline className="animate-spin w-4 h-4 text-indigo-600 shrink-0" />
+                <div className="p-3.5 rounded-xl bg-[#EDF7F2] border border-[#C6E7D5] flex items-center gap-2 text-xs text-[#0D4233] animate-pulse text-left font-medium">
+                  <IoSparklesOutline className="animate-spin w-4 h-4 text-[#0E382C] shrink-0" />
                   <span>Analyzing symptoms with clinical AI triage...</span>
                 </div>
               )}
@@ -478,12 +478,12 @@ const BookAppointment = () => {
                 </div>
               )}
 
-              {/* Interactive AI Triage Suggestion Card */}
+              {/* Interactive AI Triage Suggestion Card (Subtle Light Green Panel) */}
               {!triageLoading && triageResult && (
-                <div className="p-4 rounded-xl bg-indigo-50/70 border border-indigo-200/80 space-y-3 animate-fade-in text-left">
+                <div className="p-4 rounded-xl bg-[#EDF7F2] border border-[#C6E7D5] space-y-3 animate-fade-in text-left">
                   <div className="flex items-center justify-between flex-wrap gap-2">
-                    <div className="flex items-center gap-1.5 font-semibold text-indigo-950 text-sm">
-                      <IoSparklesOutline className="text-indigo-600 w-4 h-4" />
+                    <div className="flex items-center gap-1.5 font-bold text-[#0E382C] text-sm">
+                      <IoSparklesOutline className="text-[#0E382C] w-4 h-4" />
                       AI Triage Recommendation
                     </div>
                     <span
@@ -502,8 +502,8 @@ const BookAppointment = () => {
                   {triageResult.suggestedDepartment ? (
                     <div className="flex items-center justify-between flex-wrap gap-3 pt-1">
                       <div>
-                        <span className="text-xs text-slate-600">Suggested Department: </span>
-                        <span className="text-sm font-bold text-slate-900">
+                        <span className="text-xs text-[#526B62]">Suggested Department: </span>
+                        <span className="text-sm font-bold text-[#11261F]">
                           {triageResult.suggestedDepartment}
                         </span>
                       </div>
@@ -514,7 +514,7 @@ const BookAppointment = () => {
                         <button
                           type="button"
                           onClick={handleApplySuggestedDept}
-                          className="text-xs font-semibold px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors cursor-pointer shadow-xs flex items-center gap-1"
+                          className="text-xs font-bold px-3 py-1.5 bg-[#E5B229] hover:bg-[#D4A11D] text-[#0E382C] rounded-lg transition-colors cursor-pointer shadow-xs flex items-center gap-1"
                         >
                           <IoShieldCheckmarkOutline className="w-3.5 h-3.5" />
                           Select {triageResult.suggestedDepartment}
@@ -522,12 +522,12 @@ const BookAppointment = () => {
                       )}
                     </div>
                   ) : (
-                    <div className="pt-1 text-xs text-slate-600">
+                    <div className="pt-1 text-xs text-[#526B62]">
                       No active hospital department specifically matches these symptoms. Please select a department manually or consult General Medicine when available.
                     </div>
                   )}
 
-                  <div className="pt-2 border-t border-indigo-200/60 text-[11px] text-slate-500 italic">
+                  <div className="pt-2 border-t border-[#C6E7D5] text-[11px] text-[#526B62] italic">
                     {triageResult.disclaimer || 'AI suggestion only, not a medical diagnosis.'}
                   </div>
                 </div>
@@ -583,29 +583,29 @@ const BookAppointment = () => {
 
             {/* Step 4: Doctor Details Card */}
             {selectedDoctor && (
-              <div className="p-4 rounded-xl bg-blue-50/70 border border-blue-200/80 space-y-2 animate-fade-in text-sm text-left">
-                <div className="flex items-center gap-2 font-semibold text-blue-950">
-                  <IoPersonOutline className="text-blue-700 w-5 h-5" />
+              <div className="p-4 rounded-xl bg-[#EDF7F2]/80 border border-[#C6E7D5] space-y-2 animate-fade-in text-sm text-left">
+                <div className="flex items-center gap-2 font-bold text-[#0E382C]">
+                  <IoPersonOutline className="text-[#0E382C] w-5 h-5" />
                   Dr. {selectedDoctor.userId?.name || selectedDoctor.name}
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-slate-700 pt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-[#526B62] pt-1">
                   <div>
-                    <span className="font-semibold text-slate-900">Qualification: </span>
+                    <span className="font-semibold text-[#11261F]">Qualification: </span>
                     {selectedDoctor.qualification}
                   </div>
                   <div className="flex items-center gap-1">
-                    <IoCashOutline className="text-slate-500" />
-                    <span className="font-semibold text-slate-900">Fee: </span>$
+                    <IoCashOutline className="text-[#526B62]" />
+                    <span className="font-semibold text-[#11261F]">Fee: </span>$
                     {selectedDoctor.consultationFee}
                   </div>
                   <div className="flex items-center gap-1">
-                    <IoTimeOutline className="text-slate-500" />
-                    <span className="font-semibold text-slate-900">Hours: </span>
+                    <IoTimeOutline className="text-[#526B62]" />
+                    <span className="font-semibold text-[#11261F]">Hours: </span>
                     {selectedDoctor.availableTime?.start} - {selectedDoctor.availableTime?.end}
                   </div>
                 </div>
-                <div className="text-xs text-slate-600 pt-1 border-t border-blue-200/60">
-                  <span className="font-semibold text-slate-900">Available Days: </span>
+                <div className="text-xs text-[#526B62] pt-1 border-t border-[#C6E7D5]/60">
+                  <span className="font-semibold text-[#11261F]">Available Days: </span>
                   {selectedDoctor.availableDays?.length > 0
                     ? selectedDoctor.availableDays.join(', ')
                     : 'All days'}
@@ -636,7 +636,7 @@ const BookAppointment = () => {
             {/* Step 6: Time Slots */}
             {appointmentDate && timeSlots.length > 0 && (
               <div>
-                <label className="text-sm font-medium text-slate-700 block mb-2 text-left">
+                <label className="text-sm font-semibold text-[#11261F] block mb-2 text-left">
                   5. Available Time Slots <span className="text-red-500">*</span>
                 </label>
                 <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
@@ -649,8 +649,8 @@ const BookAppointment = () => {
                         onClick={() => setSelectedTimeSlot(slot)}
                         className={`py-2 px-3 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
                           isSelected
-                            ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                            : 'bg-white text-slate-700 border-slate-200 hover:border-blue-400 hover:bg-blue-50/50'
+                            ? 'bg-[#0E382C] text-[#E5B229] border-[#0E382C] font-bold shadow-xs'
+                            : 'bg-white text-[#11261F] border-[#CCD8D1] hover:border-[#0E382C] hover:bg-[#EDF7F2]'
                         }`}
                       >
                         {slot}

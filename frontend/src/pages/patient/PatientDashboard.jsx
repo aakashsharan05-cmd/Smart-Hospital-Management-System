@@ -76,15 +76,15 @@ const PatientDashboard = () => {
   return (
     <div className="space-y-6">
       {/* Welcome Banner */}
-      <div className="bg-linear-to-r from-blue-700 to-indigo-800 rounded-2xl p-6 sm:p-8 text-white shadow-md relative overflow-hidden">
+      <div className="bg-linear-to-r from-[#0E382C] via-[#124637] to-[#175241] rounded-2xl p-6 sm:p-8 text-white shadow-md relative overflow-hidden border border-[#164638]">
         <div className="relative z-10">
-          <span className="text-xs font-semibold tracking-wider uppercase text-blue-200">
+          <span className="text-xs font-bold tracking-wider uppercase text-[#E5B229]">
             Patient Portal
           </span>
           <h1 className="text-2xl sm:text-3xl font-extrabold mt-1 text-white">
             Welcome back, {user?.name || 'Patient'}!
           </h1>
-          <p className="text-blue-100 text-sm mt-1 max-w-xl">
+          <p className="text-emerald-100/90 text-sm mt-1 max-w-xl">
             Access your health care information, schedule appointments with top doctors, and track
             your medical history anytime.
           </p>
@@ -92,9 +92,9 @@ const PatientDashboard = () => {
           <div className="mt-5 flex flex-wrap items-center gap-3">
             <Link to="/patient/book-appointment">
               <Button
-                variant="secondary"
+                variant="mustard"
                 icon={IoAddCircleOutline}
-                className="bg-white text-blue-700 hover:bg-blue-50 border-0 shadow-sm font-semibold"
+                className="shadow-sm font-bold"
               >
                 Book Appointment
               </Button>
@@ -150,19 +150,19 @@ const PatientDashboard = () => {
         <CardHeader>
           <div>
             <CardTitle>Recent Appointments</CardTitle>
-            <p className="text-xs text-slate-500">Your latest appointment requests & schedules</p>
+            <p className="text-xs text-[#526B62]">Your latest appointment requests & schedules</p>
           </div>
           <Link
             to="/patient/appointments"
-            className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+            className="text-xs font-bold text-[#0E382C] hover:text-[#164638] flex items-center gap-1 hover:underline"
           >
             View All ({appointments.length}) <IoArrowForwardOutline className="w-3.5 h-3.5" />
           </Link>
         </CardHeader>
         <CardContent className="p-0">
           {recentAppointments.length === 0 ? (
-            <div className="py-12 text-center text-slate-400">
-              <IoCalendarOutline className="w-10 h-10 mx-auto text-slate-300 stroke-1 mb-2" />
+            <div className="py-12 text-center text-[#526B62]">
+              <IoCalendarOutline className="w-10 h-10 mx-auto text-[#CCD8D1] stroke-1 mb-2" />
               <p className="text-sm font-medium">No appointments booked yet.</p>
               <Link to="/patient/book-appointment" className="mt-3 inline-block">
                 <Button variant="primary" size="sm" icon={IoAddCircleOutline}>
@@ -171,7 +171,7 @@ const PatientDashboard = () => {
               </Link>
             </div>
           ) : (
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-[#EEF3F0]">
               {recentAppointments.map((appt) => {
                 const dateObj = new Date(appt.appointmentDate);
                 const doctorName =
@@ -182,15 +182,15 @@ const PatientDashboard = () => {
                 return (
                   <div
                     key={appt._id}
-                    className="p-4 sm:px-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50/80 transition-colors"
+                    className="p-4 sm:px-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-[#F8FAF7] transition-colors"
                   >
                     <div className="flex items-start sm:items-center gap-3.5">
-                      <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold shrink-0">
+                      <div className="w-10 h-10 rounded-xl bg-[#EDF7F2] text-[#0E382C] flex items-center justify-center font-bold shrink-0">
                         <IoPersonOutline className="w-5 h-5" />
                       </div>
                       <div>
-                        <h4 className="text-sm font-semibold text-slate-900">Dr. {doctorName}</h4>
-                        <p className="text-xs text-slate-500">
+                        <h4 className="text-sm font-semibold text-[#11261F]">Dr. {doctorName}</h4>
+                        <p className="text-xs text-[#526B62]">
                           {departmentName} &bull; Reason: {appt.reason || 'General checkup'}
                         </p>
                       </div>
@@ -198,14 +198,14 @@ const PatientDashboard = () => {
 
                     <div className="flex items-center justify-between sm:justify-end gap-4">
                       <div className="text-left sm:text-right">
-                        <div className="text-xs font-semibold text-slate-800">
+                        <div className="text-xs font-semibold text-[#11261F]">
                           {dateObj.toLocaleDateString(undefined, {
                             month: 'short',
                             day: 'numeric',
                             year: 'numeric',
                           })}
                         </div>
-                        <div className="text-[11px] text-slate-500">
+                        <div className="text-[11px] text-[#526B62]">
                           {dateObj.toLocaleTimeString(undefined, {
                             hour: '2-digit',
                             minute: '2-digit',
@@ -217,7 +217,7 @@ const PatientDashboard = () => {
                         {appt.status === 'in-queue' && appt.predictedWaitMinutes !== null && appt.predictedWaitMinutes !== undefined && (
                           <span
                             title={`${appt.waitPredictionSource === 'ml-model' ? 'Predicted by ML Model' : 'Estimated by Queue Formula'} (Approximate queue wait, not guaranteed. Typical prediction error: ${appt.typicalErrorMinutes ?? (appt.waitPredictionSource === 'ml-model' ? 2.4 : 5)} min)`}
-                            className="text-[11px] font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200/80 flex items-center gap-1"
+                            className="text-[11px] font-semibold text-[#9A7412] bg-[#FDF8EB] px-2 py-0.5 rounded border border-[#F5DE9B] flex items-center gap-1"
                           >
                             <IoTimeOutline className="w-3 h-3" />
                             ~{appt.predictedWaitMinutes} min (Typical error: {appt.typicalErrorMinutes ?? (appt.waitPredictionSource === 'ml-model' ? 2.4 : 5)}m)

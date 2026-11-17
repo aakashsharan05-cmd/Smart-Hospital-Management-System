@@ -34,9 +34,9 @@ const Alert = ({
       iconColor: 'text-amber-600',
     },
     info: {
-      container: 'bg-blue-50 border-blue-200 text-blue-800',
+      container: 'bg-[#EDF7F2] border-[#C6E7D5] text-[#0D4233]',
       icon: IoInformationCircleOutline,
-      iconColor: 'text-blue-600',
+      iconColor: 'text-[#0E382C]',
     },
   };
 

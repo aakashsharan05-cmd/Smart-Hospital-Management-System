@@ -17,19 +17,21 @@ const Button = ({
 
   const variantClasses = {
     primary:
-      'bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800 focus:ring-blue-500 shadow-xs',
+      'bg-[#0E382C] text-white hover:bg-[#164638] active:bg-[#09261E] focus:ring-[#0E382C]/30 shadow-xs font-semibold',
+    mustard:
+      'bg-[#E5B229] text-[#0E382C] hover:bg-[#D4A11D] active:bg-[#B8850C] focus:ring-[#E5B229]/40 shadow-xs font-bold',
     secondary:
-      'bg-slate-100 text-slate-700 hover:bg-slate-200 active:bg-slate-300 focus:ring-slate-400 border border-slate-200',
+      'bg-[#EDF7F2] text-[#0E382C] hover:bg-[#E2F0E8] active:bg-[#D6EADB] focus:ring-[#0E382C]/20 border border-[#C6E7D5] font-medium',
     success:
-      'bg-emerald-600 text-white hover:bg-emerald-700 active:bg-emerald-800 focus:ring-emerald-500 shadow-xs',
+      'bg-emerald-600 text-white hover:bg-emerald-700 active:bg-emerald-800 focus:ring-emerald-500 shadow-xs font-semibold',
     danger:
-      'bg-red-600 text-white hover:bg-red-700 active:bg-red-800 focus:ring-red-500 shadow-xs',
+      'bg-red-600 text-white hover:bg-red-700 active:bg-red-800 focus:ring-red-500 shadow-xs font-semibold',
     warning:
-      'bg-amber-600 text-white hover:bg-amber-700 active:bg-amber-800 focus:ring-amber-500 shadow-xs',
+      'bg-amber-600 text-white hover:bg-amber-700 active:bg-amber-800 focus:ring-amber-500 shadow-xs font-semibold',
     outline:
-      'bg-transparent border border-slate-300 text-slate-700 hover:bg-slate-50 focus:ring-blue-500',
+      'bg-transparent border border-[#CCD8D1] text-[#0E382C] hover:bg-[#EDF7F2] focus:ring-[#0E382C]/30 font-medium',
     ghost:
-      'bg-transparent text-slate-600 hover:bg-slate-100 active:bg-slate-200 focus:ring-slate-400',
+      'bg-transparent text-[#526B62] hover:bg-[#EDF7F2] hover:text-[#0E382C] active:bg-[#E2F0E8] focus:ring-[#0E382C]/20',
   };
 
   const sizeClasses = {

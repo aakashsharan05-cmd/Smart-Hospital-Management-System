@@ -222,7 +222,7 @@ const ManageBilling = () => {
 
                 return (
                   <TableRow key={bill._id}>
-                    <TableCell className="font-mono font-bold text-blue-700">
+                    <TableCell className="font-mono font-bold text-[#0E382C]">
                       {bill.invoiceNumber || bill._id.slice(-6).toUpperCase()}
                     </TableCell>
                     <TableCell>
@@ -358,7 +358,7 @@ const ManageBilling = () => {
 
           <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex justify-between items-center text-sm font-semibold text-slate-800">
             <span>Net Calculated Total:</span>
-            <span className="text-lg text-blue-700 font-bold">
+            <span className="text-lg text-[#0E382C] font-bold">
               ${Math.max(0, totalCalculated).toFixed(2)}
             </span>
           </div>
