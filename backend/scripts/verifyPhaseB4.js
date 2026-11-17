@@ -70,8 +70,8 @@ async function runB4Tests() {
 
     // 2. Launch actual Python FastAPI server and test real ML Model inference
     console.log("\n--- Test 2: Actual Python FastAPI Service & RandomForest Model Prediction ---");
-    const pythonExe = path.join(__dirname, "..", "ml-service", ".venv", "Scripts", "python.exe");
-    const mlDir = path.join(__dirname, "..", "ml-service");
+    const pythonExe = path.join(__dirname, "..", "..", "ml", ".venv", "Scripts", "python.exe");
+    const mlDir = path.join(__dirname, "..", "..", "ml");
     const realPort = 8005;
     const realMlUrl = `http://127.0.0.1:${realPort}`;
 

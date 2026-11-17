@@ -11,7 +11,7 @@ Machine learning microservice for dynamic patient wait-time prediction in the Sm
 - Virtual environment (`venv` or `uv`)
 
 ### Installation
-From the `ml-service` directory:
+From the `ml` directory:
 
 ```bash
 # Using Python venv

@@ -55,45 +55,51 @@ A full-stack, enterprise-grade Hospital Management System built on the MERN stac
 
 ```text
 SHMS/
-├── src/
-│   ├── app.js               # Express application middleware & route mounting
-│   ├── db/db.js             # Mongoose connection logic
-│   ├── middleware/          # Auth, role authorization, rate limiters, error handler
-│   ├── models/              # Mongoose models (User, Doctor, Department, Appointment, Billing...)
-│   ├── controllers/         # Request handling & HTTP response contracts
-│   ├── services/            # Core business logic:
-│   │   ├── appointmentStatus.service.js  # Centralized state machine & transactions
-│   │   ├── waitPrediction.js             # Canonical wait prediction interface
-│   │   ├── waitPrediction.service.js     # FastAPI ML caller & heuristic fallback
-│   │   ├── triage.service.js             # Gemini AI triage & active department validation
-│   │   └── socket.service.js             # Authenticated Socket.IO with room isolation
-│   ├── routes/              # Express API route declarations
-│   └── utils/               # Asia/Kolkata timezone helpers & atomic counters
-├── ml-service/              # Python FastAPI Machine Learning microservice
+├── backend/                 # Node.js Express & Socket.IO backend service
+│   ├── src/
+│   │   ├── app.js               # Express application middleware & route mounting
+│   │   ├── db/db.js             # Mongoose connection logic
+│   │   ├── middleware/          # Auth, role authorization, rate limiters, error handler
+│   │   ├── models/              # Mongoose models (User, Doctor, Department, Appointment, Billing...)
+│   │   ├── controllers/         # Request handling & HTTP response contracts
+│   │   ├── services/            # Core business logic:
+│   │   │   ├── appointmentStatus.service.js  # Centralized state machine & transactions
+│   │   │   ├── waitPrediction.js             # Canonical wait prediction interface
+│   │   │   ├── waitPrediction.service.js     # FastAPI ML caller & heuristic fallback
+│   │   │   ├── triage.service.js             # Gemini AI triage & active department validation
+│   │   │   └── socket.service.js             # Authenticated Socket.IO with room isolation
+│   │   ├── routes/              # Express API route declarations
+│   │   └── utils/               # Asia/Kolkata timezone helpers & atomic counters
+│   ├── tests/                   # Jest + Supertest integration test suite (8 suites, 36 tests)
+│   ├── scripts/
+│   │   ├── createAdmin.js       # First-time bootstrap script for admin account
+│   │   ├── seed_departments.js  # Idempotent MongoDB department seeding
+│   │   ├── seed_doctors.js      # Idempotent demo doctor seeding
+│   │   ├── verifyPhaseB4.js     # Integration test for Python ML microservice
+│   │   └── verifyPhaseB5.js     # Integration test for Gemini AI triage
+│   ├── server.js                # Server entry point (HTTP + Socket.IO)
+│   ├── package.json             # Backend dependencies & test scripts
+│   └── .env.example             # Template for required environment variables
+├── ml/                      # Python FastAPI Machine Learning microservice
 │   ├── app.py               # FastAPI server (GET /health, POST /predict)
 │   ├── generate_data.py     # Reproducible synthetic OPD dataset generator
 │   ├── train.py             # RandomForest model trainer & metrics evaluator
 │   ├── data/                # Generated 10,000-sample dataset CSV
 │   ├── models/              # Serialized pipeline (.joblib) and metrics JSON
-│   ├── tests/               # Pytest suite
+│   ├── tests/               # Pytest suite (9 tests)
 │   └── requirements.txt     # Python dependencies
 ├── frontend/                # React 19 + Vite client web application
-├── tests/                   # Jest + Supertest integration test suite
-├── scripts/
-│   ├── createAdmin.js       # First-time bootstrap script for admin account
-│   ├── verifyPhaseB4.js     # Integration test for Python ML microservice
-│   └── verifyPhaseB5.js     # Integration test for Gemini AI triage
-├── server.js                # Server entry point (HTTP + Socket.IO)
-└── .env.example             # Template for required environment variables
+├── README.md                # Root project documentation
+└── .gitignore               # Multi-tier ignore rules
 ```
 
 ---
 
 ## 4. Environment Configuration
 
-Create a `.env` file in the project root:
+Create a `.env` file in the `backend/` directory:
 ```bash
-cp .env.example .env
+cp backend/.env.example backend/.env
 ```
 
 ### Required Parameters
@@ -118,6 +124,7 @@ cp .env.example .env
 
 ### Step 1: Bootstrap Administrator Account
 ```bash
+cd backend
 npm install
 node scripts/createAdmin.js
 ```
@@ -128,7 +135,7 @@ Open 3 separate terminal tabs:
 
 #### Terminal 1: Python ML Prediction Microservice
 ```bash
-cd ml-service
+cd ml
 python -m venv .venv
 
 # Activate virtual environment
@@ -147,7 +154,7 @@ uvicorn app:app --host 0.0.0.0 --port 8000 --reload
 
 #### Terminal 2: Node.js Backend API & Socket.IO Server
 ```bash
-# In the root repository directory:
+cd backend
 npm run dev
 ```
 Backend runs on `http://localhost:5000`.
@@ -245,22 +252,23 @@ All API responses follow the standard format:
 
 ### Run Automated Tests
 ```bash
-# 1. Run Backend Jest Integration Suite (7 suites, 17 tests with In-Memory MongoDB Replica Set)
+# 1. Run Backend Jest Integration Suite
+cd backend
 npm test
 
 # 2. Run Python ML Service Unit & Validation Suite (9 tests)
-cd ml-service
+cd ../ml
 .venv\Scripts\pytest tests/ -v
 
 # 3. Run Real FastAPI + Node.js End-to-End Wait Prediction Suite
-cd ..
+cd ../backend
 node scripts/verifyPhaseB4.js
 
 # 4. Run AI Triage & Gemini Integration Suite
 node scripts/verifyPhaseB5.js
 
 # 5. Run Frontend Production Build
-cd frontend
+cd ../frontend
 npm run build
 ```
 

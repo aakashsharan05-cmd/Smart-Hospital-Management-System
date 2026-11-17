@@ -3,7 +3,7 @@ describe('Frontend Formatters Unit Tests', () => {
   let formatDepartmentOption;
 
   beforeAll(async () => {
-    const formatters = await import('../frontend/src/utils/formatters.js');
+    const formatters = await import('../../frontend/src/utils/formatters.js');
     formatDoctorName = formatters.formatDoctorName;
     formatDepartmentOption = formatters.formatDepartmentOption;
   });
