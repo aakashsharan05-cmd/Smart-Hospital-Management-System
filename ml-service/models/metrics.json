@@ -1,0 +1,37 @@
+{
+  "model_type": "RandomForestRegressor",
+  "random_seed": 42,
+  "n_samples": 10000,
+  "train_samples": 8000,
+  "test_samples": 2000,
+  "features": [
+    "queue_length",
+    "day_of_week",
+    "hour",
+    "department",
+    "doctor_experience"
+  ],
+  "metrics": {
+    "random_forest": {
+      "mae": 2.402,
+      "rmse": 3.073,
+      "r2": 0.9912
+    },
+    "linear_regression": {
+      "mae": 6.529,
+      "rmse": 9.179,
+      "r2": 0.9216
+    },
+    "heuristic_formula": {
+      "mae": 12.197,
+      "rmse": 18.556,
+      "r2": 0.6797
+    },
+    "mean_baseline": {
+      "mae": 25.115,
+      "rmse": 32.8,
+      "r2": -0.0007
+    }
+  },
+  "mae_improvement_over_heuristic_pct": 80.31
+}

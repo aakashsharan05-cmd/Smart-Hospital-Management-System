@@ -1,0 +1,152 @@
+"""
+FastAPI Wait-Time Prediction Microservice
+Serves the scikit-learn RandomForestRegressor pipeline for estimating patient wait times.
+"""
+
+import os
+from contextlib import asynccontextmanager
+from typing import Optional
+import joblib
+import pandas as pd
+from fastapi import FastAPI, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+
+# Model artifact path
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(BASE_DIR, "models", "wait_time_model.joblib")
+
+# Global pipeline instance
+model_pipeline = None
+
+def load_model():
+    global model_pipeline
+    if os.path.exists(MODEL_PATH):
+        try:
+            model_pipeline = joblib.load(MODEL_PATH)
+            print(f"[FastAPI] Successfully loaded ML pipeline from: {MODEL_PATH}")
+            return model_pipeline
+        except Exception as e:
+            print(f"[FastAPI] Warning: Failed to load model artifact: {e}")
+            model_pipeline = None
+            return None
+    else:
+        print(f"[FastAPI] Warning: Model artifact not found at {MODEL_PATH}")
+        model_pipeline = None
+        return None
+
+# Load model upon initialization
+load_model()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global model_pipeline
+    if model_pipeline is None:
+        load_model()
+    yield
+
+app = FastAPI(
+    title="SHMS Wait-Time Prediction Service",
+    description="Machine learning service predicting patient wait times in hospital OPD queues",
+    version="1.0.0",
+    lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+class WaitPredictionRequest(BaseModel):
+    queue_length: int = Field(
+        ...,
+        ge=0,
+        description="Number of patients waiting ahead in queue (non-negative integer)",
+        examples=[5],
+    )
+    day_of_week: int = Field(
+        ...,
+        ge=0,
+        le=6,
+        description="Day of week index in Asia/Kolkata (0=Monday .. 6=Sunday)",
+        examples=[1],
+    )
+    hour: int = Field(
+        ...,
+        ge=0,
+        le=23,
+        description="Current hour of day in Asia/Kolkata (0-23)",
+        examples=[14],
+    )
+    department: str = Field(
+        ...,
+        min_length=1,
+        description="Department name (e.g. Cardiology, Orthopedics, General Medicine)",
+        examples=["Cardiology"],
+    )
+    doctor_experience: int = Field(
+        default=5,
+        ge=0,
+        le=60,
+        description="Years of experience of the attending doctor",
+        examples=[10],
+    )
+
+class WaitPredictionResponse(BaseModel):
+    predicted_wait_minutes: int = Field(
+        ...,
+        ge=0,
+        description="Predicted wait time in minutes (non-negative integer)",
+        examples=[45],
+    )
+
+@app.get("/health", status_code=status.HTTP_200_OK)
+def health_check():
+    return {
+        "status": "ok",
+        "service": "wait-time-prediction",
+        "model_loaded": model_pipeline is not None,
+        "model_file": os.path.basename(MODEL_PATH) if model_pipeline is not None else None,
+    }
+
+@app.post(
+    "/predict",
+    response_model=WaitPredictionResponse,
+    status_code=status.HTTP_200_OK,
+)
+def predict_wait_time(request: WaitPredictionRequest):
+    if model_pipeline is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Wait-time prediction model is not loaded or unavailable",
+        )
+
+    try:
+        # Construct single-row DataFrame matching training feature columns
+        input_df = pd.DataFrame([{
+            "queue_length": request.queue_length,
+            "day_of_week": request.day_of_week,
+            "hour": request.hour,
+            "department": request.department.strip(),
+            "doctor_experience": request.doctor_experience,
+        }])
+
+        raw_pred = model_pipeline.predict(input_df)[0]
+
+        # Enforce non-negative integer prediction
+        predicted_minutes = max(0, int(round(float(raw_pred))))
+
+        return WaitPredictionResponse(predicted_wait_minutes=predicted_minutes)
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Inference error during wait-time prediction: {str(e)}",
+        )
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=False)
