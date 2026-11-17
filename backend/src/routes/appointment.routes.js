@@ -15,6 +15,7 @@ const {
   getAppointmentWaitEstimate,
   getTriageSuggestion,
   checkInAppointment,
+  markMissedAppointment,
   startConsultation,
   endConsultation,
   cancelAppointment,
@@ -49,6 +50,14 @@ router.patch(
   protect,
   authorizeRoles("receptionist", "admin"),
   checkInAppointment
+);
+
+// Receptionist / Admin marks appointment as missed (confirmed|in-queue -> missed)
+router.patch(
+  "/:id/mark-missed",
+  protect,
+  authorizeRoles("receptionist", "admin"),
+  markMissedAppointment
 );
 
 // Doctor starts consultation (in-queue -> in-consultation)

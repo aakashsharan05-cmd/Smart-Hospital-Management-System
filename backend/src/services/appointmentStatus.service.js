@@ -154,6 +154,37 @@ const checkInAppointmentService = async (appointmentId) => {
 };
 
 /**
+ * Service: Mark appointment as missed (confirmed|in-queue -> missed)
+ */
+const markMissedAppointmentService = async (appointmentId) => {
+  const appointment = await Appointment.findById(appointmentId);
+  if (!appointment) {
+    const err = new Error("Appointment not found");
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const check = validateStatusTransition(appointment.status, "missed");
+  if (!check.allowed) {
+    const err = new Error(check.message);
+    err.statusCode = 400;
+    throw err;
+  }
+
+  appointment.status = "missed";
+  await appointment.save();
+
+  await updateQueueWaitEstimates(appointment.doctor);
+  const populated = await populateAppointment(appointment._id);
+
+  // Emit only AFTER DB write succeeds
+  await emitAppointmentStatusChanged(populated);
+  await emitQueueUpdate(appointment.doctor);
+
+  return populated;
+};
+
+/**
  * Service: Start doctor consultation -> in-consultation
  */
 const startConsultationService = async ({ appointmentId, doctorProfileId }) => {
@@ -447,6 +478,7 @@ module.exports = {
   validateStatusTransition,
   updateAppointmentStatusService,
   checkInAppointmentService,
+  markMissedAppointmentService,
   startConsultationService,
   endConsultationService,
   cancelAppointmentService,

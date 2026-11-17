@@ -16,6 +16,7 @@ const {
   validateStatusTransition,
   updateAppointmentStatusService,
   checkInAppointmentService,
+  markMissedAppointmentService,
   startConsultationService,
   endConsultationService,
   cancelAppointmentService,
@@ -689,6 +690,34 @@ const checkInAppointment = async (req, res) => {
   }
 };
 
+// ── Mark appointment as missed (Receptionist/Admin) ─────────
+const markMissedAppointment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid appointment ID",
+      });
+    }
+
+    const populated = await markMissedAppointmentService(id);
+
+    return res.status(200).json({
+      success: true,
+      message: "Appointment marked as missed successfully",
+      appointment: populated,
+    });
+  } catch (error) {
+    console.error("Mark missed error:", error.message);
+    const statusCode = error.statusCode || 500;
+    return res.status(statusCode).json({
+      success: false,
+      message: statusCode === 500 ? "Server error during marking appointment missed" : error.message,
+    });
+  }
+};
+
 // ── Doctor starts consultation (Doctor only) ──────────────
 const startConsultation = async (req, res) => {
   try {
@@ -905,6 +934,7 @@ module.exports = {
   getAppointmentWaitEstimate,
   getTriageSuggestion,
   checkInAppointment,
+  markMissedAppointment,
   startConsultation,
   endConsultation,
   cancelAppointment,

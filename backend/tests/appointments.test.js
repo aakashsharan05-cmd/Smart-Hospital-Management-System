@@ -243,4 +243,66 @@ describe("Appointments, Concurrency & Ownership Tests", () => {
     expect(resToday.body.appointment.status).toBe("in-queue");
     expect(resToday.body.appointment.checkInTime).toBeDefined();
   });
+
+  test("PATCH /api/appointments/:id/mark-missed transitions confirmed|in-queue -> missed, rejects completed, enforces role", async () => {
+    // 1. confirmed -> missed
+    const apptConfirmed = await Appointment.create({
+      patient: patientUser._id,
+      doctor: doc1._id,
+      department: dept._id,
+      appointmentDate: new Date(),
+      status: "confirmed",
+      reason: "No show checkup",
+      queueNumber: 11,
+    });
+
+    const resConfirmedMissed = await request(app)
+      .patch(`/api/appointments/${apptConfirmed._id}/mark-missed`)
+      .set("Authorization", `Bearer ${recToken}`);
+
+    expect(resConfirmedMissed.status).toBe(200);
+    expect(resConfirmedMissed.body.appointment.status).toBe("missed");
+
+    // 2. in-queue -> missed
+    const apptInQueue = await Appointment.create({
+      patient: patientUser._id,
+      doctor: doc1._id,
+      department: dept._id,
+      appointmentDate: new Date(),
+      status: "in-queue",
+      reason: "Left waiting room",
+      queueNumber: 12,
+    });
+
+    const resQueueMissed = await request(app)
+      .patch(`/api/appointments/${apptInQueue._id}/mark-missed`)
+      .set("Authorization", `Bearer ${recToken}`);
+
+    expect(resQueueMissed.status).toBe(200);
+    expect(resQueueMissed.body.appointment.status).toBe("missed");
+
+    // 3. completed -> missed (illegal transition, rejected with 400)
+    const apptCompleted = await Appointment.create({
+      patient: patientUser._id,
+      doctor: doc1._id,
+      department: dept._id,
+      appointmentDate: new Date(),
+      status: "completed",
+      reason: "Done appointment",
+      queueNumber: 13,
+    });
+
+    const resCompletedMissed = await request(app)
+      .patch(`/api/appointments/${apptCompleted._id}/mark-missed`)
+      .set("Authorization", `Bearer ${recToken}`);
+
+    expect(resCompletedMissed.status).toBe(400);
+
+    // 4. Role enforcement: patient role cannot mark missed (rejected with 403)
+    const resForbidden = await request(app)
+      .patch(`/api/appointments/${apptInQueue._id}/mark-missed`)
+      .set("Authorization", `Bearer ${p1Token}`);
+
+    expect(resForbidden.status).toBe(403);
+  });
 });
