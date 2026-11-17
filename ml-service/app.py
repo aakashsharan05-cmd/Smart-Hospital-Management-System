@@ -4,6 +4,7 @@ Serves the scikit-learn RandomForestRegressor pipeline for estimating patient wa
 """
 
 import os
+import json
 from contextlib import asynccontextmanager
 from typing import Optional
 import joblib
@@ -15,12 +16,30 @@ from pydantic import BaseModel, Field
 # Model artifact path
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, "models", "wait_time_model.joblib")
+METRICS_PATH = os.path.join(BASE_DIR, "models", "metrics.json")
 
-# Global pipeline instance
+# Global pipeline instance and typical error (MAE on held-out validation residuals)
 model_pipeline = None
+typical_error_minutes = 2.4
+
+def load_metrics():
+    global typical_error_minutes
+    if os.path.exists(METRICS_PATH):
+        try:
+            with open(METRICS_PATH, "r") as f:
+                data = json.load(f)
+                mae = data.get("metrics", {}).get("random_forest", {}).get("mae", 2.4)
+                typical_error_minutes = round(float(mae), 1)
+                print(f"[FastAPI] Loaded typical error (MAE on validation residuals): ±{typical_error_minutes} min")
+        except Exception as e:
+            print(f"[FastAPI] Note: Error reading metrics.json: {e}. Using default 2.4 min.")
+            typical_error_minutes = 2.4
+    else:
+        typical_error_minutes = 2.4
 
 def load_model():
     global model_pipeline
+    load_metrics()
     if os.path.exists(MODEL_PATH):
         try:
             model_pipeline = joblib.load(MODEL_PATH)
@@ -102,6 +121,12 @@ class WaitPredictionResponse(BaseModel):
         description="Predicted wait time in minutes (non-negative integer)",
         examples=[45],
     )
+    typical_error_minutes: float = Field(
+        ...,
+        ge=0.0,
+        description="Typical prediction error (Mean Absolute Error on hold-out validation residuals)",
+        examples=[2.4],
+    )
 
 @app.get("/health", status_code=status.HTTP_200_OK)
 def health_check():
@@ -109,6 +134,7 @@ def health_check():
         "status": "ok",
         "service": "wait-time-prediction",
         "model_loaded": model_pipeline is not None,
+        "typical_error_minutes": typical_error_minutes,
         "model_file": os.path.basename(MODEL_PATH) if model_pipeline is not None else None,
     }
 
@@ -139,7 +165,10 @@ def predict_wait_time(request: WaitPredictionRequest):
         # Enforce non-negative integer prediction
         predicted_minutes = max(0, int(round(float(raw_pred))))
 
-        return WaitPredictionResponse(predicted_wait_minutes=predicted_minutes)
+        return WaitPredictionResponse(
+            predicted_wait_minutes=predicted_minutes,
+            typical_error_minutes=typical_error_minutes,
+        )
 
     except Exception as e:
         raise HTTPException(

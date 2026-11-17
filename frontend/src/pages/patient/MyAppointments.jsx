@@ -213,7 +213,7 @@ const MyAppointments = () => {
                 const deptName =
                   appt.department?.name || appt.doctor?.department?.name || 'General';
 
-                const canCancel = appt.status === 'pending' || appt.status === 'confirmed';
+                const canCancel = appt.status === 'pending' || appt.status === 'confirmed' || appt.status === 'in-queue';
                 const canReschedule = appt.status === 'pending';
 
                 return (
@@ -245,7 +245,18 @@ const MyAppointments = () => {
                       </span>
                     </TableCell>
                     <TableCell>
-                      <Badge status={appt.status} />
+                      <div className="flex flex-col items-start gap-1">
+                        <Badge status={appt.status} />
+                        {appt.status === 'in-queue' && appt.predictedWaitMinutes !== null && appt.predictedWaitMinutes !== undefined && (
+                          <span
+                            title={`${appt.waitPredictionSource === 'ml-model' ? 'Predicted by ML Model' : 'Estimated by Queue Formula'} (Approximate queue wait, not guaranteed. Typical margin ±${appt.typicalErrorMinutes ?? (appt.waitPredictionSource === 'ml-model' ? 2.4 : 5)} min)`}
+                            className="text-[11px] font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200/80 flex items-center gap-1"
+                          >
+                            <IoTimeOutline className="w-3 h-3" />
+                            ~{appt.predictedWaitMinutes} min (±{appt.typicalErrorMinutes ?? (appt.waitPredictionSource === 'ml-model' ? 2.4 : 5)}m)
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-right space-x-2">
                       {canReschedule && (

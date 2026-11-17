@@ -45,6 +45,9 @@ def test_valid_prediction(client):
     assert "predicted_wait_minutes" in data
     assert isinstance(data["predicted_wait_minutes"], int)
     assert data["predicted_wait_minutes"] >= 0
+    assert "typical_error_minutes" in data
+    assert isinstance(data["typical_error_minutes"], (int, float))
+    assert data["typical_error_minutes"] > 0
     # For queue_length 5 in Cardiology, wait should be roughly 50-80 min
     assert 30 <= data["predicted_wait_minutes"] <= 120
 

@@ -76,8 +76,18 @@ const computeWaitTime = async ({
         data.wait_time;
 
       if (rawPrediction !== undefined && !isNaN(Number(rawPrediction))) {
+        const rawTypicalError =
+          data.typical_error_minutes ??
+          data.typicalErrorMinutes ??
+          data.mae;
+        const typicalErrorMinutes =
+          rawTypicalError !== undefined && !isNaN(Number(rawTypicalError))
+            ? Math.round(Number(rawTypicalError) * 10) / 10
+            : 2.4;
+
         return {
           predictedWaitMinutes: Math.max(0, Math.round(Number(rawPrediction))),
+          typicalErrorMinutes,
           waitPredictionSource: "ml-model",
         };
       }
@@ -89,6 +99,7 @@ const computeWaitTime = async ({
 
   return {
     predictedWaitMinutes: Math.round(fallbackWait),
+    typicalErrorMinutes: 5.0,
     waitPredictionSource: "fallback-formula",
   };
 };
@@ -129,7 +140,7 @@ const updateQueueWaitEstimates = async (doctorId) => {
     const appt = waitingAppointments[i];
     const queueLengthAhead = inConsultCount + i;
 
-    const { predictedWaitMinutes, waitPredictionSource } = await computeWaitTime({
+    const { predictedWaitMinutes, typicalErrorMinutes, waitPredictionSource } = await computeWaitTime({
       queueLength: queueLengthAhead,
       date: new Date(),
       departmentName,
@@ -137,6 +148,7 @@ const updateQueueWaitEstimates = async (doctorId) => {
     });
 
     appt.predictedWaitMinutes = predictedWaitMinutes;
+    appt.typicalErrorMinutes = typicalErrorMinutes;
     appt.waitPredictionSource = waitPredictionSource;
     await appt.save();
     updatedAppointments.push(appt);

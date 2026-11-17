@@ -388,7 +388,7 @@ const cancelAppointment = async (req, res) => {
       });
     }
 
-    if (!["pending", "confirmed"].includes(appointment.status)) {
+    if (!["pending", "confirmed", "in-queue"].includes(appointment.status)) {
       return res.status(400).json({
         success: false,
         message: `Cannot cancel an appointment with status '${appointment.status}'`,
@@ -832,6 +832,9 @@ const getAppointmentWaitEstimate = async (req, res) => {
       queueNumber: appointment.queueNumber || null,
       queuePosition,
       predictedWaitMinutes: appointment.predictedWaitMinutes || 0,
+      typicalErrorMinutes:
+        appointment.typicalErrorMinutes ??
+        (appointment.waitPredictionSource === "ml-model" ? 2.4 : 5.0),
       waitPredictionSource: appointment.waitPredictionSource || "fallback-formula",
     });
   } catch (error) {

@@ -108,6 +108,11 @@ const appointmentSchema = new mongoose.Schema(
       default: null,
     },
 
+    typicalErrorMinutes: {
+      type: Number,
+      default: null,
+    },
+
     waitPredictionSource: {
       type: String,
       enum: ["ml-model", "fallback-formula", null],

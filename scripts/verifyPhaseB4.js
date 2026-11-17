@@ -104,18 +104,20 @@ async function runB4Tests() {
       livePrediction.waitPredictionSource !== "ml-model" ||
       typeof livePrediction.predictedWaitMinutes !== "number" ||
       livePrediction.predictedWaitMinutes < 30 ||
-      livePrediction.predictedWaitMinutes > 120
+      livePrediction.predictedWaitMinutes > 120 ||
+      typeof livePrediction.typicalErrorMinutes !== "number" ||
+      livePrediction.typicalErrorMinutes <= 0
     ) {
       throw new Error(`Test 2 Failed: Unexpected model output: ${JSON.stringify(livePrediction)}`);
     }
-    console.log(`✓ Test 2 Passed: Real RandomForestRegressor predicted ${livePrediction.predictedWaitMinutes} min with source 'ml-model'.`);
+    console.log(`✓ Test 2 Passed: Real RandomForestRegressor predicted ${livePrediction.predictedWaitMinutes} min (±${livePrediction.typicalErrorMinutes} min) with source 'ml-model'.`);
 
     // 3. Test 1.5s Timeout handling with a delayed mock server
     console.log("\n--- Test 3: 1.5s Timeout handling when ML service hangs ---");
     let hangingServer = http.createServer((req, res) => {
       setTimeout(() => {
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ predicted_wait_minutes: 99 }));
+        res.end(JSON.stringify({ predicted_wait_minutes: 99, typical_error_minutes: 2.4 }));
       }, 2500);
     });
     await new Promise((r) => hangingServer.listen(0, r));
@@ -130,7 +132,8 @@ async function runB4Tests() {
     if (
       elapsed > 2000 ||
       timeoutResult.predictedWaitMinutes !== 21 ||
-      timeoutResult.waitPredictionSource !== "fallback-formula"
+      timeoutResult.waitPredictionSource !== "fallback-formula" ||
+      typeof timeoutResult.typicalErrorMinutes !== "number"
     ) {
       throw new Error("Test 3 Failed: Did not abort at 1.5s timeout or fallback formula failed");
     }
@@ -205,6 +208,14 @@ async function runB4Tests() {
       process.env.JWT_SECRET,
       { expiresIn: "1h" }
     );
+    const patient4 = await User.create({
+      name: "Patient Four",
+      email: "p4@hospital.com",
+      phone: "+919876543214",
+      password: await bcrypt.hash("Pass123!", 10),
+      role: "patient",
+      isActive: true,
+    });
     const p1Token = jwt.sign(
       { userId: patient1._id.toString(), role: "patient" },
       process.env.JWT_SECRET,
@@ -220,13 +231,19 @@ async function runB4Tests() {
       process.env.JWT_SECRET,
       { expiresIn: "1h" }
     );
+    const p4Token = jwt.sign(
+      { userId: patient4._id.toString(), role: "patient" },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
     const docToken = jwt.sign(
       { userId: docUser._id.toString(), role: "doctor" },
       process.env.JWT_SECRET,
       { expiresIn: "1h" }
     );
 
-    // 4a. Walk-in 1 creation for Dr. Heart
+    // Event 1: Walk-in registration (Event 1: walk-in creation)
+    console.log("\n-> Event 1: Walk-in creation");
     const resW1 = await request(app)
       .post("/api/appointments/walk-in")
       .set("Authorization", `Bearer ${staffToken}`)
@@ -236,12 +253,11 @@ async function runB4Tests() {
         reason: "Chest discomfort",
       });
     const appt1Id = resW1.body.appointment._id;
-    console.log("Walk-in 1 wait time (ML model):", resW1.body.appointment?.predictedWaitMinutes, "source:", resW1.body.appointment?.waitPredictionSource);
+    console.log("Walk-in 1 wait time (ML model):", resW1.body.appointment?.predictedWaitMinutes, "source:", resW1.body.appointment?.waitPredictionSource, "typicalError:", resW1.body.appointment?.typicalErrorMinutes);
     if (resW1.body.appointment?.waitPredictionSource !== "ml-model") {
       throw new Error("Test 4a Failed: Expected waitPredictionSource to be 'ml-model'");
     }
 
-    // 4b. Walk-in 2 creation
     const resW2 = await request(app)
       .post("/api/appointments/walk-in")
       .set("Authorization", `Bearer ${staffToken}`)
@@ -252,12 +268,12 @@ async function runB4Tests() {
       });
     const appt2Id = resW2.body.appointment._id;
     console.log("Walk-in 2 wait time (ML model):", resW2.body.appointment?.predictedWaitMinutes, "source:", resW2.body.appointment?.waitPredictionSource);
-    // Walk-in 2 has 1 person ahead -> wait time should be greater than walk-in 1
     if (resW2.body.appointment?.predictedWaitMinutes <= resW1.body.appointment?.predictedWaitMinutes) {
       throw new Error("Test 4b Failed: Second patient wait time should be greater than first patient");
     }
 
-    // 4c. Check-in of a confirmed appointment (Patient 3)
+    // Event 2: Scheduled check-in
+    console.log("\n-> Event 2: Scheduled check-in");
     const confirmedAppt = await Appointment.create({
       patient: patient3._id,
       doctor: doctor._id,
@@ -270,18 +286,34 @@ async function runB4Tests() {
     const resCheckIn = await request(app)
       .patch(`/api/appointments/${confirmedAppt._id}/check-in`)
       .set("Authorization", `Bearer ${staffToken}`);
-    console.log("Patient 3 check-in wait time (ML model):", resCheckIn.body.appointment?.predictedWaitMinutes);
+    console.log("Patient 3 check-in wait time (ML model):", resCheckIn.body.appointment?.predictedWaitMinutes, "typicalError:", resCheckIn.body.appointment?.typicalErrorMinutes);
     if (resCheckIn.body.appointment?.predictedWaitMinutes <= resW2.body.appointment?.predictedWaitMinutes) {
       throw new Error("Test 4c Failed: Third patient wait time should be greater than second patient");
     }
 
-    // 4d. Doctor starts consultation with Patient 1
+    // Add Patient 4 in queue behind Patient 3
+    const resW4 = await request(app)
+      .post("/api/appointments/walk-in")
+      .set("Authorization", `Bearer ${staffToken}`)
+      .send({
+        patientId: patient4._id.toString(),
+        doctorId: doctor._id.toString(),
+        reason: "Follow-up",
+      });
+    const appt4Id = resW4.body.appointment._id;
+    console.log("Patient 4 initial wait in queue (3 ahead):", resW4.body.appointment?.predictedWaitMinutes);
+
+    // Event 3: Consultation start
+    console.log("\n-> Event 3: Consultation start");
     const resStart = await request(app)
       .patch(`/api/appointments/${appt1Id}/start-consultation`)
       .set("Authorization", `Bearer ${docToken}`);
     console.log("Patient 1 started consultation. Status:", resStart.body.appointment?.status);
+    const appt2AfterStart = await Appointment.findById(appt2Id);
+    console.log("Patient 2 wait time after consult start:", appt2AfterStart.predictedWaitMinutes);
 
-    // 4e. Doctor ends consultation with Patient 1
+    // Event 4: Consultation end
+    console.log("\n-> Event 4: Consultation end");
     const resEnd = await request(app)
       .patch(`/api/appointments/${appt1Id}/end-consultation`)
       .set("Authorization", `Bearer ${docToken}`)
@@ -290,19 +322,31 @@ async function runB4Tests() {
 
     // Patient 2 is now first in queue with 0 ahead -> wait time should decrease!
     const appt2AfterEnd = await Appointment.findById(appt2Id);
-    console.log("Patient 2 wait time after consult end (now 1st):", appt2AfterEnd.predictedWaitMinutes);
+    console.log("Patient 2 wait time after consult end (now 1st in queue):", appt2AfterEnd.predictedWaitMinutes);
     if (appt2AfterEnd.predictedWaitMinutes > 20) {
       throw new Error("Test 4e Failed: Patient 2 wait time should have significantly decreased after consult end");
     }
 
-    // 4f. Cancellation of Patient 3
+    // Check Patient 4 wait before cancellation of Patient 3
+    const appt4BeforeCancel = await Appointment.findById(appt4Id);
+    console.log("Patient 4 wait before Patient 3 cancels:", appt4BeforeCancel.predictedWaitMinutes);
+
+    // Event 5: Cancellation of Patient 3
+    console.log("\n-> Event 5: Cancellation");
     const resCancel = await request(app)
       .patch(`/api/appointments/${confirmedAppt._id}/cancel`)
       .set("Authorization", `Bearer ${p3Token}`)
       .send({ cancellationReason: "Feeling better" });
     console.log("Patient 3 cancelled status:", resCancel.body.appointment?.status);
 
-    console.log("✓ Test 4 Passed: Real ML Model predictions dynamically updated across walk-in, check-in, start, end, and cancel.");
+    // Check Patient 4 wait after cancellation of Patient 3 -> queue shortened by 1, wait time should decrease!
+    const appt4AfterCancel = await Appointment.findById(appt4Id);
+    console.log("Patient 4 wait after Patient 3 cancels:", appt4AfterCancel.predictedWaitMinutes);
+    if (appt4AfterCancel.predictedWaitMinutes >= appt4BeforeCancel.predictedWaitMinutes) {
+      throw new Error("Test 4f Failed: Patient 4 wait time should have decreased after Patient 3 cancelled");
+    }
+
+    console.log("✓ Test 4 Passed: Real ML Model predictions dynamically recalculated across all 5 events: walk-in, check-in, start-consultation, end-consultation, and cancellation.");
 
     // 5. Test Endpoint GET /api/appointments/:id/wait-estimate
     console.log("\n--- Test 5: GET /api/appointments/:id/wait-estimate endpoint ---");
@@ -317,7 +361,9 @@ async function runB4Tests() {
       estimateRes.status !== 200 ||
       estimateRes.body.queuePosition !== 1 ||
       estimateRes.body.waitPredictionSource !== "ml-model" ||
-      typeof estimateRes.body.predictedWaitMinutes !== "number"
+      typeof estimateRes.body.predictedWaitMinutes !== "number" ||
+      typeof estimateRes.body.typicalErrorMinutes !== "number" ||
+      estimateRes.body.typicalErrorMinutes <= 0
     ) {
       throw new Error("Test 5a Failed: Wait estimate endpoint response mismatch");
     }
