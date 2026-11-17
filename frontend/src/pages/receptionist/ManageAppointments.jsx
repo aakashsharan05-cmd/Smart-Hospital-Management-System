@@ -23,6 +23,7 @@ import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
 import Modal from '../../components/ui/Modal';
 import Alert from '../../components/ui/Alert';
+import { formatDoctorName } from '../../utils/formatters';
 import useQueueSocket from '../../hooks/useQueueSocket';
 import {
   IoCalendarOutline,
@@ -242,7 +243,7 @@ const ManageAppointments = () => {
             <option value="all">All Doctors</option>
             {doctors.map((doc) => (
               <option key={doc._id} value={doc._id}>
-                Dr. {doc.userId?.name || doc.name} ({doc.specialization})
+                {formatDoctorName(doc.userId?.name || doc.name)} ({doc.specialization})
               </option>
             ))}
           </Select>
@@ -325,7 +326,7 @@ const ManageAppointments = () => {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="text-slate-800 font-medium">Dr. {docName}</div>
+                      <div className="text-slate-800 font-medium">{formatDoctorName(docName)}</div>
                       <div className="text-xs text-slate-500">{appt.department?.name}</div>
                     </TableCell>
                     <TableCell>
@@ -473,7 +474,7 @@ const ManageAppointments = () => {
             >
               {doctors.map((doc) => (
                 <option key={doc._id} value={doc._id}>
-                  Dr. {doc.userId?.name || doc.name} ({doc.specialization} - {doc.department?.name || 'General'})
+                  {formatDoctorName(doc.userId?.name || doc.name)} ({doc.specialization} - {doc.department?.name || 'General'})
                 </option>
               ))}
             </Select>

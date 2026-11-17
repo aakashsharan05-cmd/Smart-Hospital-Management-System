@@ -22,6 +22,7 @@ import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
 import Modal from '../../components/ui/Modal';
 import Alert from '../../components/ui/Alert';
+import { formatDoctorName } from '../../utils/formatters';
 import {
   IoAddCircleOutline,
   IoEyeOutline,
@@ -264,7 +265,7 @@ const ManageDoctors = () => {
                 return (
                   <TableRow key={doc._id}>
                     <TableCell>
-                      <div className="font-semibold text-slate-900">Dr. {name}</div>
+                      <div className="font-semibold text-slate-900">{formatDoctorName(name)}</div>
                       <div className="text-xs text-slate-500">{email}</div>
                     </TableCell>
                     <TableCell>
@@ -314,7 +315,7 @@ const ManageDoctors = () => {
       <Modal
         isOpen={viewModalOpen}
         onClose={() => setViewModalOpen(false)}
-        title={`Dr. ${viewingDoctor?.userId?.name || viewingDoctor?.name || 'Doctor'}`}
+        title={formatDoctorName(viewingDoctor?.userId?.name || viewingDoctor?.name)}
         subtitle="Physician Profile & Practice Credentials"
       >
         {viewingDoctor && (

@@ -14,6 +14,7 @@ import { StatCard } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import Alert from '../../components/ui/Alert';
+import { formatDoctorName } from '../../utils/formatters';
 import {
   IoReceiptOutline,
   IoCashOutline,
@@ -144,7 +145,7 @@ const MyBills = () => {
                       })}
                     </TableCell>
                     <TableCell>
-                      <span className="font-medium text-slate-900">Dr. {doctorName}</span>
+                      <span className="font-medium text-slate-900">{formatDoctorName(doctorName)}</span>
                     </TableCell>
                     <TableCell>₹{(bill.consultationFee || 0).toFixed(2)}</TableCell>
                     <TableCell>₹{(bill.medicineCharges || 0).toFixed(2)}</TableCell>

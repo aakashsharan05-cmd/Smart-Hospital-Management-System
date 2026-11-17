@@ -7,6 +7,7 @@ import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import Alert from '../../components/ui/Alert';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import { formatDoctorName } from '../../utils/formatters';
 import {
   IoCalendarOutline,
   IoTimeOutline,
@@ -65,7 +66,7 @@ const DoctorDashboard = () => {
           Physician Portal
         </span>
         <h1 className="text-2xl sm:text-3xl font-extrabold mt-1 text-white">
-          Welcome, Dr. {user?.name || 'Physician'}
+          Welcome, {formatDoctorName(user?.name)}
         </h1>
         <p className="text-emerald-100/90 text-sm mt-1 max-w-xl">
           Here is your daily clinical schedule, patient consultations queue, and pending

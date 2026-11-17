@@ -20,6 +20,7 @@ import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
 import Alert from '../../components/ui/Alert';
 import Input from '../../components/ui/Input';
+import { formatDoctorName } from '../../utils/formatters';
 import {
   IoCalendarOutline,
   IoCloseCircleOutline,
@@ -235,7 +236,7 @@ const MyAppointments = () => {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="font-medium text-slate-900">Dr. {doctorName}</div>
+                      <div className="font-medium text-slate-900">{formatDoctorName(doctorName)}</div>
                       <div className="text-xs text-slate-500">{appt.doctor?.specialization}</div>
                     </TableCell>
                     <TableCell>{deptName}</TableCell>

@@ -22,6 +22,7 @@ import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
 import Modal from '../../components/ui/Modal';
 import Alert from '../../components/ui/Alert';
+import { formatDoctorName } from '../../utils/formatters';
 import {
   IoReceiptOutline,
   IoAddCircleOutline,
@@ -229,7 +230,7 @@ const ManageBilling = () => {
                       <div className="font-medium text-slate-900">{patientName}</div>
                       <div className="text-xs text-slate-500">{bill.patient?.email}</div>
                     </TableCell>
-                    <TableCell>Dr. {doctorName}</TableCell>
+                    <TableCell>{formatDoctorName(doctorName)}</TableCell>
                     <TableCell className="font-bold text-slate-900">
                       ₹{(bill.totalAmount || 0).toFixed(2)}
                     </TableCell>
@@ -306,7 +307,7 @@ const ManageBilling = () => {
               const dateStr = new Date(appt.appointmentDate).toLocaleDateString();
               return (
                 <option key={appt._id} value={appt._id}>
-                  {pName} with Dr. {dName} on {dateStr} ({appt.status})
+                  {pName} with {formatDoctorName(dName)} on {dateStr} ({appt.status})
                 </option>
               );
             })}

@@ -12,6 +12,7 @@ import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import Alert from '../../components/ui/Alert';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import { formatDoctorName } from '../../utils/formatters';
 import {
   IoPeopleOutline,
   IoMedicalOutline,
@@ -239,7 +240,7 @@ const AdminDashboard = () => {
                         </div>
                         <div className="text-left">
                           <h4 className="text-sm font-semibold text-slate-900">
-                            {patientName} &rarr; Dr. {docName}
+                            {patientName} &rarr; {formatDoctorName(docName)}
                           </h4>
                           <p className="text-xs text-slate-500">
                             {dateObj.toLocaleDateString(undefined, {

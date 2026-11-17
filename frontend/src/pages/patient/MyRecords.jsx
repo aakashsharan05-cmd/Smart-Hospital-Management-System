@@ -4,6 +4,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Ca
 import Button from '../../components/ui/Button';
 import Alert from '../../components/ui/Alert';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import { formatDoctorName } from '../../utils/formatters';
 import {
   IoDocumentTextOutline,
   IoPersonOutline,
@@ -120,7 +121,7 @@ const MyRecords = () => {
                       </h3>
                       <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1">
                         <span className="flex items-center gap-1">
-                          <IoPersonOutline /> Dr. {doctorName} ({specialization})
+                          <IoPersonOutline /> {formatDoctorName(doctorName)} ({specialization})
                         </span>
                         <span>&bull;</span>
                         <span className="flex items-center gap-1">

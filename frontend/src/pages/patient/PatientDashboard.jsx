@@ -8,6 +8,7 @@ import Badge from '../../components/ui/Badge';
 import Alert from '../../components/ui/Alert';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import useQueueSocket from '../../hooks/useQueueSocket';
+import { formatDoctorName } from '../../utils/formatters';
 import {
   IoCalendarOutline,
   IoTimeOutline,
@@ -189,7 +190,7 @@ const PatientDashboard = () => {
                         <IoPersonOutline className="w-5 h-5" />
                       </div>
                       <div>
-                        <h4 className="text-sm font-semibold text-[#11261F]">Dr. {doctorName}</h4>
+                        <h4 className="text-sm font-semibold text-[#11261F]">{formatDoctorName(doctorName)}</h4>
                         <p className="text-xs text-[#526B62]">
                           {departmentName} &bull; Reason: {appt.reason || 'General checkup'}
                         </p>

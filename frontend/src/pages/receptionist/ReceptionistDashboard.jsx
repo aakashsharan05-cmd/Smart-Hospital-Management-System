@@ -7,6 +7,7 @@ import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import Alert from '../../components/ui/Alert';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import { formatDoctorName } from '../../utils/formatters';
 import {
   IoCalendarOutline,
   IoTimeOutline,
@@ -150,7 +151,7 @@ const ReceptionistDashboard = () => {
                       <div>
                         <h4 className="text-sm font-semibold text-[#11261F]">{patientName}</h4>
                         <p className="text-xs text-[#526B62]">
-                          Doctor: Dr. {docName} &bull; Contact: {appt.patient?.phone || 'N/A'}
+                          Doctor: {formatDoctorName(docName)} &bull; Contact: {appt.patient?.phone || 'N/A'}
                         </p>
                       </div>
                     </div>

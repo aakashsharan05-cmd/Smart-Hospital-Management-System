@@ -14,6 +14,7 @@ import Input from '../../components/ui/Input';
 import Alert from '../../components/ui/Alert';
 import Badge from '../../components/ui/Badge';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import { formatDoctorName, formatDepartmentOption } from '../../utils/formatters';
 import {
   IoCalendarOutline,
   IoCheckmarkCircle,
@@ -242,7 +243,7 @@ const BookAppointment = () => {
         !selectedDoctor.availableDays.includes(dayName)
       ) {
         setError(
-          `Dr. ${selectedDoctor.userId?.name || 'Doctor'} is not available on ${dayName}s. Available days: ${selectedDoctor.availableDays.join(', ')}`
+          `${formatDoctorName(selectedDoctor.userId?.name || selectedDoctor.name)} is not available on ${dayName}s. Available days: ${selectedDoctor.availableDays.join(', ')}`
         );
       } else {
         setError('');
@@ -330,7 +331,7 @@ const BookAppointment = () => {
               <div className="flex justify-between items-center">
                 <span className="text-sm text-slate-500">Doctor</span>
                 <span className="text-sm font-semibold text-slate-900">
-                  Dr. {selectedDoctor?.userId?.name || selectedDoctor?.name || 'Doctor'}
+                  {formatDoctorName(selectedDoctor?.userId?.name || selectedDoctor?.name)}
                 </span>
               </div>
               <div className="flex justify-between items-center">
@@ -546,7 +547,7 @@ const BookAppointment = () => {
               >
                 {departments.map((dept) => (
                   <option key={dept._id} value={dept._id}>
-                    {dept.name} {dept.location ? `(${dept.location})` : ''}
+                    {formatDepartmentOption(dept)}
                   </option>
                 ))}
               </Select>
@@ -568,7 +569,7 @@ const BookAppointment = () => {
                 >
                   {doctors.map((doc) => (
                     <option key={doc._id} value={doc._id}>
-                      Dr. {doc.userId?.name || doc.name} - {doc.specialization} (
+                      {formatDoctorName(doc.userId?.name || doc.name)} - {doc.specialization} (
                       {doc.experience} yrs exp)
                     </option>
                   ))}
@@ -586,7 +587,7 @@ const BookAppointment = () => {
               <div className="p-4 rounded-xl bg-[#EDF7F2]/80 border border-[#C6E7D5] space-y-2 animate-fade-in text-sm text-left">
                 <div className="flex items-center gap-2 font-bold text-[#0E382C]">
                   <IoPersonOutline className="text-[#0E382C] w-5 h-5" />
-                  Dr. {selectedDoctor.userId?.name || selectedDoctor.name}
+                  {formatDoctorName(selectedDoctor.userId?.name || selectedDoctor.name)}
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-[#526B62] pt-1">
                   <div>
