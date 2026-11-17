@@ -1,40 +1,17 @@
 const Billing = require("../models/billing.model");
 const Appointment = require("../models/appointment.model");
 const Doctor = require("../models/doctor.model");
+const Prescription = require("../models/prescription.model");
+const Medicine = require("../models/pharmacy.model");
 const mongoose = require("mongoose");
+const { getNextInvoiceNumber } = require("../utils/counter");
 
-// Generate a unique invoice number: INV-YYYYMMDD-XXXX
-const generateInvoiceNumber = async () => {
-  const today = new Date();
-  const dateStr =
-    today.getFullYear().toString() +
-    String(today.getMonth() + 1).padStart(2, "0") +
-    String(today.getDate()).padStart(2, "0");
-
-  const prefix = `INV-${dateStr}-`;
-
-  // Find the last invoice for today to increment
-  const lastBill = await Billing.findOne({
-    invoiceNumber: { $regex: `^${prefix}` },
-  }).sort({ invoiceNumber: -1 });
-
-  let seq = 1;
-  if (lastBill) {
-    const lastSeq = parseInt(lastBill.invoiceNumber.split("-")[2], 10);
-    if (!isNaN(lastSeq)) {
-      seq = lastSeq + 1;
-    }
-  }
-
-  return `${prefix}${String(seq).padStart(4, "0")}`;
-};
-
-// ── Create bill for a completed appointment ───────────────
+// ── Create bill for a completed appointment (Transaction) ─
 const createBill = async (req, res) => {
+  const session = await mongoose.startSession();
   try {
     const {
       appointmentId,
-      consultationFee,
       medicineCharges,
       otherCharges,
       discount,
@@ -55,7 +32,7 @@ const createBill = async (req, res) => {
       });
     }
 
-    // Verify appointment exists
+    // Verify appointment exists and populate doctor info
     const appointment = await Appointment.findById(appointmentId).populate(
       "doctor",
       "consultationFee"
@@ -68,6 +45,14 @@ const createBill = async (req, res) => {
       });
     }
 
+    // Requirement: only allow createBill when appointment.status === "completed"
+    if (appointment.status !== "completed") {
+      return res.status(400).json({
+        success: false,
+        message: `Bills can only be created for completed appointments (current status: '${appointment.status}')`,
+      });
+    }
+
     // Check if bill already exists for this appointment
     const existingBill = await Billing.findOne({ appointment: appointmentId });
     if (existingBill) {
@@ -77,41 +62,83 @@ const createBill = async (req, res) => {
       });
     }
 
-    // Use provided consultation fee or fall back to doctor's default
-    const fee =
-      consultationFee != null
-        ? Number(consultationFee)
-        : appointment.doctor?.consultationFee || 0;
+    // Requirement: take consultationFee ONLY from Doctor document, never from client
+    const fee = appointment.doctor?.consultationFee ?? 0;
 
-    const medCharges = Number(medicineCharges) || 0;
+    // Requirement: Compute medicineCharges server-side from prescription's medicines
+    let computedMedicineCharges = 0;
+    const prescription = await Prescription.findOne({
+      appointment: appointmentId,
+    });
+
+    if (prescription && prescription.medicines && prescription.medicines.length > 0) {
+      for (const item of prescription.medicines) {
+        if (!item.name) continue;
+        const medDoc = await Medicine.findOne({
+          name: { $regex: new RegExp(`^${item.name.trim()}$`, "i") },
+          isActive: true,
+        });
+        if (medDoc) {
+          const parsedDuration = parseInt(item.duration, 10);
+          const qty = !isNaN(parsedDuration) && parsedDuration > 0 ? parsedDuration : 1;
+          computedMedicineCharges += medDoc.price * qty;
+        }
+      }
+    }
+
+    const finalMedicineCharges =
+      computedMedicineCharges > 0
+        ? computedMedicineCharges
+        : Number(medicineCharges) || 0;
+
     const othCharges = Number(otherCharges) || 0;
     const disc = Number(discount) || 0;
 
-    if (fee < 0 || medCharges < 0 || othCharges < 0 || disc < 0) {
+    if (othCharges < 0 || disc < 0 || finalMedicineCharges < 0) {
       return res.status(400).json({
         success: false,
-        message: "Charges and discount must be non-negative",
+        message: "Charges and discount must be non-negative numbers",
       });
     }
 
-    const totalAmount = fee + medCharges + othCharges - disc;
+    // Requirement: Cap discount so it cannot exceed total charges before discount
+    const subtotal = fee + finalMedicineCharges + othCharges;
+    if (disc > subtotal) {
+      return res.status(400).json({
+        success: false,
+        message: `Discount (₹${disc}) cannot exceed total charges before discount (₹${subtotal})`,
+      });
+    }
 
-    const invoiceNumber = await generateInvoiceNumber();
+    const totalAmount = subtotal - disc;
 
-    const bill = await Billing.create({
-      appointment: appointmentId,
-      patient: appointment.patient,
-      doctor: appointment.doctor._id || appointment.doctor,
-      consultationFee: fee,
-      medicineCharges: medCharges,
-      otherCharges: othCharges,
-      discount: disc,
-      totalAmount: Math.max(totalAmount, 0),
-      paymentMethod: paymentMethod || "other",
-      invoiceNumber,
+    let createdBill;
+    await session.withTransaction(async () => {
+      // Collision-safe invoice number via atomic counter
+      const invoiceNumber = await getNextInvoiceNumber(new Date(), session);
+
+      const [bill] = await Billing.create(
+        [
+          {
+            appointment: appointmentId,
+            patient: appointment.patient,
+            doctor: appointment.doctor._id || appointment.doctor,
+            consultationFee: fee,
+            medicineCharges: finalMedicineCharges,
+            otherCharges: othCharges,
+            discount: disc,
+            totalAmount,
+            paymentMethod: paymentMethod || "other",
+            invoiceNumber,
+          },
+        ],
+        { session }
+      );
+
+      createdBill = bill;
     });
 
-    const populated = await Billing.findById(bill._id)
+    const populated = await Billing.findById(createdBill._id)
       .populate("patient", "name email phone")
       .populate({
         path: "doctor",
@@ -136,8 +163,10 @@ const createBill = async (req, res) => {
     console.error("Create bill error:", error.message);
     return res.status(500).json({
       success: false,
-      message: "Server error",
+      message: error.message || "Server error while creating bill",
     });
+  } finally {
+    await session.endSession();
   }
 };
 
@@ -254,8 +283,9 @@ const getBillById = async (req, res) => {
   }
 };
 
-// ── Mark bill as paid ─────────────────────────────────────
+// ── Mark bill as paid + deduct pharmacy stock (Transaction)
 const markBillPaid = async (req, res) => {
+  const session = await mongoose.startSession();
   try {
     const { id } = req.params;
 
@@ -266,41 +296,74 @@ const markBillPaid = async (req, res) => {
       });
     }
 
-    const bill = await Billing.findById(id);
-    if (!bill) {
-      return res.status(404).json({
-        success: false,
-        message: "Bill not found",
-      });
-    }
+    let updatedBill;
+    await session.withTransaction(async () => {
+      const bill = await Billing.findById(id).session(session);
+      if (!bill) {
+        const err = new Error("Bill not found");
+        err.statusCode = 404;
+        throw err;
+      }
 
-    if (bill.paymentStatus === "paid") {
-      return res.status(400).json({
-        success: false,
-        message: "Bill is already marked as paid",
-      });
-    }
+      if (bill.paymentStatus === "paid") {
+        const err = new Error("Bill is already marked as paid");
+        err.statusCode = 400;
+        throw err;
+      }
 
-    const { paymentMethod } = req.body;
+      // Requirement: Deduct pharmacy stock for prescribed medicines using transaction
+      const prescription = await Prescription.findOne({
+        appointment: bill.appointment,
+      }).session(session);
 
-    bill.paymentStatus = "paid";
-    bill.paidAt = new Date();
-    if (paymentMethod) {
-      bill.paymentMethod = paymentMethod;
-    }
-    await bill.save();
+      if (prescription && prescription.medicines && prescription.medicines.length > 0) {
+        for (const item of prescription.medicines) {
+          if (!item.name) continue;
+          const parsedDuration = parseInt(item.duration, 10);
+          const qty = !isNaN(parsedDuration) && parsedDuration > 0 ? parsedDuration : 1;
+
+          const medDoc = await Medicine.findOne({
+            name: { $regex: new RegExp(`^${item.name.trim()}$`, "i") },
+          }).session(session);
+
+          if (medDoc) {
+            if (medDoc.stock < qty) {
+              const err = new Error(
+                `Insufficient pharmacy stock for medicine '${medDoc.name}'. In stock: ${medDoc.stock}, required: ${qty}`
+              );
+              err.statusCode = 400;
+              throw err;
+            }
+            medDoc.stock -= qty;
+            await medDoc.save({ session });
+          }
+        }
+      }
+
+      const { paymentMethod } = req.body;
+      bill.paymentStatus = "paid";
+      bill.paidAt = new Date();
+      if (paymentMethod) {
+        bill.paymentMethod = paymentMethod;
+      }
+      await bill.save({ session });
+      updatedBill = bill;
+    });
 
     return res.status(200).json({
       success: true,
-      message: "Bill marked as paid",
-      bill,
+      message: "Bill marked as paid and pharmacy inventory updated",
+      bill: updatedBill,
     });
   } catch (error) {
     console.error("Mark bill paid error:", error.message);
-    return res.status(500).json({
+    const statusCode = error.statusCode || 400;
+    return res.status(statusCode).json({
       success: false,
-      message: "Server error",
+      message: error.message || "Failed to process bill payment",
     });
+  } finally {
+    await session.endSession();
   }
 };
 
