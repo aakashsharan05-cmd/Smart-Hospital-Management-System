@@ -104,4 +104,55 @@ describe("Walk-in Registration & Deduplication Tests", () => {
     const matchingUsers = await User.find({ phone });
     expect(matchingUsers.length).toBe(1);
   });
+
+  test("Walk-in requires resolved user role to be 'patient'", async () => {
+    // 1. Attempt walk-in with a patientId belonging to a doctor user -> 400
+    const doctorUserId = doctor.userId;
+    const resId = await request(app)
+      .post("/api/appointments/walk-in")
+      .set("Authorization", `Bearer ${staffToken}`)
+      .send({
+        doctorId: doctor._id.toString(),
+        patientId: doctorUserId.toString(),
+        reason: "Invalid doctor patientId walkin",
+      });
+
+    expect(resId.status).toBe(400);
+    expect(resId.body.message).toMatch(/not a patient/i);
+
+    // 2. Attempt walk-in with a phone number matching receptionist user -> 400
+    const resPhone = await request(app)
+      .post("/api/appointments/walk-in")
+      .set("Authorization", `Bearer ${staffToken}`)
+      .send({
+        doctorId: doctor._id.toString(),
+        patient: { name: "Fake Staff Walkin", phone: "+919777700002" },
+        reason: "Invalid phone walkin",
+      });
+
+    expect(resPhone.status).toBe(400);
+    expect(resPhone.body.message).toMatch(/not a patient/i);
+  });
+
+  test("Walk-in returns generic message on unexpected 500 error and does not leak internal error.message", async () => {
+    jest.spyOn(User, "create").mockImplementationOnce(() => {
+      throw new Error("SENSITIVE_INTERNAL_DATABASE_CRASH_DETAILS");
+    });
+
+    const res500 = await request(app)
+      .post("/api/appointments/walk-in")
+      .set("Authorization", `Bearer ${staffToken}`)
+      .send({
+        doctorId: doctor._id.toString(),
+        patient: { name: "Test 500 Patient", phone: "+919999988888" },
+        reason: "Test 500 sanitization",
+      });
+
+    expect(res500.status).toBe(500);
+    expect(res500.body.success).toBe(false);
+    expect(res500.body.message).toBe("Failed to create walk-in appointment");
+    expect(res500.body.message).not.toContain("SENSITIVE_INTERNAL_DATABASE");
+
+    User.create.mockRestore();
+  });
 });

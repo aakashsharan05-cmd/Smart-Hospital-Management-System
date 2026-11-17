@@ -655,10 +655,11 @@ const createWalkInAppointment = async (req, res) => {
       appointment: populated,
     });
   } catch (error) {
-    console.error("Create walk-in error:", error.message);
-    return res.status(error.statusCode || 500).json({
+    console.error("Create walk-in error:", error);
+    const statusCode = error.statusCode || 500;
+    return res.status(statusCode).json({
       success: false,
-      message: error.message || "Failed to create walk-in appointment",
+      message: statusCode === 500 ? "Failed to create walk-in appointment" : error.message,
     });
   }
 };
@@ -682,10 +683,11 @@ const checkInAppointment = async (req, res) => {
       appointment: populated,
     });
   } catch (error) {
-    console.error("Check-in error:", error.message);
-    return res.status(error.statusCode || 500).json({
+    console.error("Check-in error:", error);
+    const statusCode = error.statusCode || 500;
+    return res.status(statusCode).json({
       success: false,
-      message: error.message || "Server error during check-in",
+      message: statusCode === 500 ? "Server error during check-in" : error.message,
     });
   }
 };

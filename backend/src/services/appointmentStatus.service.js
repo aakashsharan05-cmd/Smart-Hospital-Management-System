@@ -349,6 +349,11 @@ const createWalkInAppointmentService = async ({
         err.statusCode = 404;
         throw err;
       }
+      if (existingUser.role !== "patient") {
+        const err = new Error("User resolved by ID is not a patient");
+        err.statusCode = 400;
+        throw err;
+      }
       resolvedPatientId = existingUser._id;
     } else if (patient && typeof patient === "object") {
       const { name, phone, email } = patient;
@@ -367,6 +372,11 @@ const createWalkInAppointmentService = async ({
       const existingByPhone = await User.findOne({ phone: trimmedPhone }).session(activeSession);
 
       if (existingByPhone) {
+        if (existingByPhone.role !== "patient") {
+          const err = new Error("Existing user with this phone number is not a patient");
+          err.statusCode = 400;
+          throw err;
+        }
         resolvedPatientId = existingByPhone._id;
       } else {
         let patientEmail = email?.trim().toLowerCase();
