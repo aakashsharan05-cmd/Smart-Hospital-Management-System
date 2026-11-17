@@ -10,7 +10,11 @@ const { getKolkataDateString } = require("./timezone");
  * @returns {Promise<number>} - The next sequence number (1, 2, 3...)
  */
 const getNextSequence = async (key, session = null) => {
-  const options = { new: true, upsert: true, setDefaultsOnInsert: true };
+  const options = {
+    returnDocument: "after",
+    upsert: true,
+    setDefaultsOnInsert: true,
+  };
   if (session) {
     options.session = session;
   }

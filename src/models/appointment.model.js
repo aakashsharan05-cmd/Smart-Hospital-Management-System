@@ -77,21 +77,19 @@ const appointmentSchema = new mongoose.Schema(
   }
 );
 
-appointmentSchema.pre("validate", function (next) {
+appointmentSchema.pre("validate", function () {
   if (this.appointmentDate && !this.slotStart) {
     const d = new Date(this.appointmentDate);
     const mins = d.getMinutes() < 30 ? 0 : 30;
     d.setMinutes(mins, 0, 0);
     this.slotStart = d;
   }
-  next();
 });
 
-appointmentSchema.pre("save", function (next) {
+appointmentSchema.pre("save", function () {
   if (this.isModified("status") || this.isNew) {
     this.isSlotActive = !["cancelled", "rejected"].includes(this.status);
   }
-  next();
 });
 
 // Unique partial index: prevent double-booking for the same doctor at the same 30-min slot
