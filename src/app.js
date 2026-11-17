@@ -1,9 +1,11 @@
 const express = require("express");
 const cors = require("cors");
+const helmet = require("helmet");
 
 const app = express();
 
-// ── Core Middleware ───────────────────────────────────────
+// ── Security Headers & Middleware ─────────────────────────
+app.use(helmet());
 app.use(
   cors({
     origin: process.env.CORS_ORIGIN || "http://localhost:5173",

@@ -1,4 +1,5 @@
 const express = require("express");
+const rateLimit = require("express-rate-limit");
 
 const {
   registerUser,
@@ -9,8 +10,20 @@ const User = require("../models/user.model");
 
 const router = express.Router();
 
-router.post("/register", registerUser);
-router.post("/login", loginUser);
+// Strict rate limit for auth endpoints to prevent brute force
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // maximum 10 requests per 15 minutes per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: "Too many authentication attempts. Please try again after 15 minutes.",
+  },
+});
+
+router.post("/register", authLimiter, registerUser);
+router.post("/login", authLimiter, loginUser);
 
 // Get current authenticated user's info
 router.get("/me", protect, async (req, res) => {
