@@ -67,11 +67,7 @@ const PatientDashboard = () => {
   const totalAppointments = appointments.length;
   const now = new Date();
   const upcomingAppointments = appointments.filter((appt) => {
-    const apptDate = new Date(appt.appointmentDate);
-    return (
-      apptDate >= now &&
-      (appt.status === 'confirmed' || appt.status === 'pending')
-    );
+    return ['pending', 'confirmed', 'in-queue', 'in-consultation'].includes(appt.status);
   }).length;
 
   const pendingBills = bills.filter((b) => b.paymentStatus === 'pending').length;

@@ -58,10 +58,11 @@ const createPrescription = async (req, res) => {
       });
     }
 
-    if (!["confirmed", "completed"].includes(appointment.status)) {
+    if (!["in-consultation", "completed"].includes(appointment.status)) {
       return res.status(400).json({
         success: false,
-        message: "Prescription can only be created for confirmed or completed appointments",
+        message:
+          "Prescription can only be created for appointments in-consultation or completed",
       });
     }
 

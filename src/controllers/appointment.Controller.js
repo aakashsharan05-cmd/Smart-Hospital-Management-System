@@ -8,6 +8,9 @@ const {
   isTimeWithinRange,
 } = require("../utils/timezone");
 const { getNextQueueNumber } = require("../utils/counter");
+const {
+  validateStatusTransition,
+} = require("../services/appointmentStatus.service");
 
 // Normalize a Date to its 30-minute slot start (e.g. 10:15 -> 10:00:00.000, 10:45 -> 10:30:00.000)
 const normalizeSlotStart = (date) => {
@@ -526,7 +529,7 @@ const rescheduleAppointment = async (req, res) => {
   }
 };
 
-// ── Update appointment status (confirm/reject/complete) ───
+// ── Update appointment status (pending -> confirmed | rejected only) ─
 const updateAppointmentStatus = async (req, res) => {
   try {
     const { id } = req.params;
@@ -538,7 +541,15 @@ const updateAppointmentStatus = async (req, res) => {
     }
 
     const { status, notes } = req.body;
-    const validStatuses = ["confirmed", "rejected", "completed"];
+    if (status === "completed") {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Completion is only permitted via doctor consultation completion (/api/appointments/:id/end-consultation)",
+      });
+    }
+
+    const validStatuses = ["confirmed", "rejected"];
     if (!status || !validStatuses.includes(status)) {
       return res.status(400).json({
         success: false,
@@ -554,17 +565,12 @@ const updateAppointmentStatus = async (req, res) => {
       });
     }
 
-    // Validate status transitions
-    const allowedTransitions = {
-      pending: ["confirmed", "rejected"],
-      confirmed: ["completed", "rejected"],
-    };
-
-    const allowed = allowedTransitions[appointment.status];
-    if (!allowed || !allowed.includes(status)) {
+    // Validate state transition using the centralized transition engine
+    const check = validateStatusTransition(appointment.status, status);
+    if (!check.allowed) {
       return res.status(400).json({
         success: false,
-        message: `Cannot change status from '${appointment.status}' to '${status}'`,
+        message: check.message,
       });
     }
 

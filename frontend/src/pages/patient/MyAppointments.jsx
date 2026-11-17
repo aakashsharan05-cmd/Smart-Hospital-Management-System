@@ -70,12 +70,14 @@ const MyAppointments = () => {
     const apptDate = new Date(appt.appointmentDate);
     if (activeTab === 'upcoming') {
       return (
-        apptDate >= now &&
-        (appt.status === 'confirmed' || appt.status === 'pending')
+        ['pending', 'confirmed', 'in-queue', 'in-consultation'].includes(appt.status)
       );
     }
     if (activeTab === 'past') {
-      return apptDate < now || appt.status === 'completed';
+      return (
+        ['completed', 'missed'].includes(appt.status) ||
+        (apptDate < now && !['in-queue', 'in-consultation', 'pending', 'confirmed'].includes(appt.status))
+      );
     }
     if (activeTab === 'cancelled') {
       return appt.status === 'cancelled' || appt.status === 'rejected';

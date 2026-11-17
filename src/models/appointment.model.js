@@ -48,11 +48,70 @@ const appointmentSchema = new mongoose.Schema(
       enum: [
         "pending",
         "confirmed",
-        "cancelled",
+        "in-queue",
+        "in-consultation",
         "completed",
+        "cancelled",
         "rejected",
+        "missed",
       ],
       default: "pending",
+    },
+
+    appointmentType: {
+      type: String,
+      enum: ["scheduled", "walk-in"],
+      default: "scheduled",
+    },
+
+    checkInTime: {
+      type: Date,
+      default: null,
+    },
+
+    consultationStartTime: {
+      type: Date,
+      default: null,
+    },
+
+    consultationEndTime: {
+      type: Date,
+      default: null,
+    },
+
+    symptomText: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    aiTriageSuggestion: {
+      suggestedDepartment: {
+        type: String,
+        trim: true,
+        default: "",
+      },
+      urgency: {
+        type: String,
+        enum: ["low", "medium", "high", ""],
+        default: "",
+      },
+      disclaimer: {
+        type: String,
+        trim: true,
+        default: "",
+      },
+    },
+
+    predictedWaitMinutes: {
+      type: Number,
+      default: null,
+    },
+
+    waitPredictionSource: {
+      type: String,
+      enum: ["ml-model", "fallback-formula", null],
+      default: null,
     },
 
     queueNumber: {
@@ -88,7 +147,7 @@ appointmentSchema.pre("validate", function () {
 
 appointmentSchema.pre("save", function () {
   if (this.isModified("status") || this.isNew) {
-    this.isSlotActive = !["cancelled", "rejected"].includes(this.status);
+    this.isSlotActive = !["cancelled", "rejected", "missed"].includes(this.status);
   }
 });
 

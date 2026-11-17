@@ -9,6 +9,10 @@ const Badge = ({ status = '', variant, children, className = '' }) => {
       case 'doctor':
       case 'info':
         return 'bg-blue-50 text-blue-700 border-blue-200';
+      case 'in-queue':
+        return 'bg-indigo-50 text-indigo-700 border-indigo-200';
+      case 'in-consultation':
+        return 'bg-teal-50 text-teal-700 border-teal-200';
       case 'completed':
       case 'paid':
       case 'active':
@@ -22,6 +26,7 @@ const Badge = ({ status = '', variant, children, className = '' }) => {
         return 'bg-amber-50 text-amber-700 border-amber-200';
       case 'cancelled':
       case 'rejected':
+      case 'missed':
       case 'failed':
       case 'danger':
       case 'expired':

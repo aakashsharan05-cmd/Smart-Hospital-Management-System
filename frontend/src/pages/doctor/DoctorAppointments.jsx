@@ -148,9 +148,12 @@ const DoctorAppointments = () => {
               <option value="all">All Statuses</option>
               <option value="pending">Pending</option>
               <option value="confirmed">Confirmed</option>
+              <option value="in-queue">In Queue</option>
+              <option value="in-consultation">In Consultation</option>
               <option value="completed">Completed</option>
               <option value="cancelled">Cancelled</option>
               <option value="rejected">Rejected</option>
+              <option value="missed">Missed</option>
             </Select>
           </div>
           <div className="w-full sm:w-48">
@@ -261,27 +264,16 @@ const DoctorAppointments = () => {
                           </>
                         )}
 
-                        {appt.status === 'confirmed' && (
-                          <>
-                            <Link to={`/doctor/prescriptions/create/${appt._id}`}>
-                              <Button
-                                variant="primary"
-                                size="sm"
-                                icon={IoDocumentTextOutline}
-                              >
-                                Prescribe
-                              </Button>
-                            </Link>
+                        {(appt.status === 'in-consultation' || appt.status === 'completed') && (
+                          <Link to={`/doctor/prescriptions/create/${appt._id}`}>
                             <Button
-                              variant="secondary"
+                              variant="primary"
                               size="sm"
-                              icon={IoCheckmarkOutline}
-                              isLoading={isActionLoading}
-                              onClick={() => handleStatusUpdate(appt._id, 'completed')}
+                              icon={IoDocumentTextOutline}
                             >
-                              Complete
+                              Prescribe
                             </Button>
-                          </>
+                          </Link>
                         )}
 
                         {appt.status === 'completed' && (
