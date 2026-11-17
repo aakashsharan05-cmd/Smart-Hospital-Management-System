@@ -154,6 +154,11 @@ export const bookAppointment = async (appointmentData) => {
   return response.data;
 };
 
+export const getTriageSuggestion = async (symptomText) => {
+  const response = await api.post('/api/appointments/triage', { symptomText });
+  return response.data;
+};
+
 export const getMyAppointments = async () => {
   const response = await api.get('/api/appointments/my');
   return response.data;

@@ -11,6 +11,7 @@ const {
   isTimeWithinRange,
 } = require("../utils/timezone");
 const { getNextQueueNumber } = require("../utils/counter");
+const { triageSymptoms } = require("../services/triage.service");
 const {
   validateStatusTransition,
   updateAppointmentStatusService,
@@ -138,6 +139,9 @@ const bookAppointment = async (req, res) => {
     // Assign atomic queue number per doctor per day (Asia/Kolkata date)
     const queueNumber = await getNextQueueNumber(doctor._id, slotStart);
 
+    // Server-side independent AI symptom triage - NEVER trust client-submitted triage
+    const triageResult = await triageSymptoms(reason);
+
     // Create appointment with normalized slot
     const appointment = await Appointment.create({
       patient: req.user.userId,
@@ -147,6 +151,12 @@ const bookAppointment = async (req, res) => {
       slotStart,
       isSlotActive: true,
       reason: reason.trim(),
+      symptomText: reason.trim(),
+      aiTriageSuggestion: {
+        suggestedDepartment: triageResult.suggestedDepartment,
+        urgency: triageResult.urgency,
+        disclaimer: triageResult.disclaimer,
+      },
       queueNumber,
     });
 
@@ -846,6 +856,45 @@ const getAppointmentWaitEstimate = async (req, res) => {
   }
 };
 
+// ── AI Symptom Triage Suggestion (Patient only) ─────────────
+const getTriageSuggestion = async (req, res) => {
+  try {
+    const symptomText = req.body.symptomText || req.body.reason;
+
+    if (!symptomText || typeof symptomText !== "string" || !symptomText.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid symptomText is required",
+      });
+    }
+
+    const trimmed = symptomText.trim();
+    if (trimmed.length > 1000) {
+      return res.status(400).json({
+        success: false,
+        message: "Symptom text cannot exceed 1000 characters",
+      });
+    }
+
+    const triage = await triageSymptoms(trimmed);
+
+    return res.status(200).json({
+      success: true,
+      triage: {
+        suggestedDepartment: triage.suggestedDepartment,
+        urgency: triage.urgency,
+        disclaimer: triage.disclaimer,
+      },
+    });
+  } catch (error) {
+    console.error("Triage controller error:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: "Server error during symptom triage",
+    });
+  }
+};
+
 module.exports = {
   bookAppointment,
   createWalkInAppointment,
@@ -854,6 +903,7 @@ module.exports = {
   getAllAppointments,
   getAppointmentById,
   getAppointmentWaitEstimate,
+  getTriageSuggestion,
   checkInAppointment,
   startConsultation,
   endConsultation,

@@ -4,6 +4,7 @@ import {
   getDepartments,
   getDoctors,
   bookAppointment,
+  getTriageSuggestion,
   getErrorMessage,
 } from '../../services/api';
 import { Card, CardContent } from '../../components/ui/Card';
@@ -20,6 +21,9 @@ import {
   IoCashOutline,
   IoTimeOutline,
   IoArrowForward,
+  IoWarningOutline,
+  IoSparklesOutline,
+  IoShieldCheckmarkOutline,
 } from 'react-icons/io5';
 
 const DAYS_OF_WEEK = [
@@ -48,7 +52,11 @@ const BookAppointment = () => {
   const [selectedTimeSlot, setSelectedTimeSlot] = useState('');
   const [reason, setReason] = useState('');
 
-  // States
+  // AI Triage State
+  const [triageLoading, setTriageLoading] = useState(false);
+  const [triageResult, setTriageResult] = useState(null);
+
+  // Form submission states
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [successData, setSuccessData] = useState(null);
@@ -118,6 +126,44 @@ const BookAppointment = () => {
     };
   }, [selectedDepartment]);
 
+  // 3. Debounced AI Symptom Triage Suggestion (500ms delay, minimum 5 chars)
+  useEffect(() => {
+    const text = reason.trim();
+    if (text.length < 5) {
+      setTriageResult(null);
+      setTriageLoading(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        setTriageLoading(true);
+        const res = await getTriageSuggestion(text);
+        if (res.success && res.triage) {
+          setTriageResult(res.triage);
+        }
+      } catch (err) {
+        // Triage is non-blocking; do not disrupt booking flow if rate-limited
+        console.error('Triage suggestion unavailable:', err);
+      } finally {
+        setTriageLoading(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [reason]);
+
+  // Handle clicking "Apply Suggested Department"
+  const handleApplySuggestedDept = () => {
+    if (!triageResult?.suggestedDepartment || !departments.length) return;
+    const matched = departments.find(
+      (d) => d.name.toLowerCase() === triageResult.suggestedDepartment.toLowerCase()
+    );
+    if (matched) {
+      setSelectedDepartment(matched._id);
+    }
+  };
+
   // Find currently selected doctor object
   const selectedDoctor = useMemo(() => {
     return doctors.find((d) => d._id === selectedDoctorId) || null;
@@ -138,15 +184,13 @@ const BookAppointment = () => {
     const formatMinutes = (totalMinutes) => {
       const h = Math.floor(totalMinutes / 60);
       const m = totalMinutes % 60;
-      const hStr = h.toString().padStart(2, '0');
-      const mStr = m.toString().padStart(2, '0');
-      return `${hStr}:${mStr}`;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
     };
 
     const startMin = parseMinutes(startTime);
     const endMin = parseMinutes(endTime);
-    const slots = [];
 
+    const slots = [];
     for (let current = startMin; current < endMin; current += 30) {
       slots.push(formatMinutes(current));
     }
@@ -157,13 +201,11 @@ const BookAppointment = () => {
   // Validate if selected date falls on an available day
   const isDateValidForDoctor = (dateStr) => {
     if (!dateStr || !selectedDoctor) return false;
-    // Check future date
     const selected = new Date(dateStr + 'T00:00:00');
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (selected < today) return false;
 
-    // Check available days
     const dayName = DAYS_OF_WEEK[selected.getDay()];
     if (
       selectedDoctor.availableDays &&
@@ -201,6 +243,10 @@ const BookAppointment = () => {
     e.preventDefault();
     setError('');
 
+    if (!reason.trim()) {
+      setError('Please describe your medical reason or symptoms for the visit.');
+      return;
+    }
     if (!selectedDepartment) {
       setError('Please choose a medical department.');
       return;
@@ -219,10 +265,6 @@ const BookAppointment = () => {
     }
     if (!selectedTimeSlot) {
       setError('Please pick an available time slot.');
-      return;
-    }
-    if (!reason.trim()) {
-      setError('Please describe your medical reason or symptoms for the visit.');
       return;
     }
 
@@ -304,6 +346,33 @@ const BookAppointment = () => {
                   </span>
                 </div>
               )}
+
+              {/* Server-persisted AI Triage Suggestion */}
+              {successData.aiTriageSuggestion?.suggestedDepartment && (
+                <div className="pt-3 border-t border-slate-200 text-xs text-slate-700 space-y-1.5">
+                  <div className="flex justify-between items-center">
+                    <span className="font-semibold text-slate-700 flex items-center gap-1">
+                      <IoSparklesOutline className="text-indigo-600" /> AI Triage Assessment
+                    </span>
+                    <span className="font-bold text-slate-900">
+                      {successData.aiTriageSuggestion.suggestedDepartment} (
+                      <span className={
+                        successData.aiTriageSuggestion.urgency === 'high'
+                          ? 'text-red-600 font-bold'
+                          : successData.aiTriageSuggestion.urgency === 'medium'
+                          ? 'text-amber-600 font-bold'
+                          : 'text-emerald-600 font-bold'
+                      }>
+                        {successData.aiTriageSuggestion.urgency || 'low'} urgency
+                      </span>
+                      )
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 italic text-right">
+                    {successData.aiTriageSuggestion.disclaimer || 'AI suggestion only, not a medical diagnosis.'}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
@@ -323,6 +392,7 @@ const BookAppointment = () => {
                   setAppointmentDate('');
                   setSelectedTimeSlot('');
                   setReason('');
+                  setTriageResult(null);
                 }}
               >
                 Book Another
@@ -340,8 +410,7 @@ const BookAppointment = () => {
       <div>
         <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Book an Appointment</h1>
         <p className="text-sm text-slate-500 mt-1">
-          Select department, choose your preferred physician, and reserve an available appointment
-          slot.
+          Describe your symptoms, choose your department and physician, and reserve an available appointment slot.
         </p>
       </div>
 
@@ -350,10 +419,96 @@ const BookAppointment = () => {
       <Card>
         <CardContent className="p-6 sm:p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Step 1: Department */}
+            {/* Step 1: Reason / Symptoms with AI Triage Assistant */}
+            <div className="text-left space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-semibold text-slate-900 block">
+                  1. Reason for Visit & Symptoms <span className="text-red-500">*</span>
+                </label>
+                {triageLoading && (
+                  <span className="text-xs text-indigo-600 font-medium flex items-center gap-1">
+                    <IoSparklesOutline className="animate-spin w-3.5 h-3.5" />
+                    AI analyzing symptoms...
+                  </span>
+                )}
+              </div>
+              <textarea
+                rows={3}
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Describe what symptoms or issues you are experiencing (e.g. persistent headache, chest discomfort, joint pain)..."
+                required
+                maxLength={500}
+                className="w-full rounded-lg border border-slate-300 p-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
+              />
+              <div className="flex justify-between items-center text-xs text-slate-400">
+                <span>Real-time AI suggestions activate after 5 characters</span>
+                <span>{reason.length}/500</span>
+              </div>
+
+              {/* High-Urgency Emergency Notice */}
+              {triageResult?.urgency === 'high' && (
+                <div className="p-4 rounded-xl bg-red-50 border border-red-300 text-red-900 space-y-1.5 animate-fade-in">
+                  <div className="flex items-center gap-2 font-bold text-red-800 text-sm">
+                    <IoWarningOutline className="w-5 h-5 text-red-600 shrink-0" />
+                    Urgent Medical Attention Notice
+                  </div>
+                  <p className="text-xs text-red-700 leading-relaxed">
+                    The symptoms entered indicate potential high clinical urgency. If you or the patient are experiencing a life-threatening medical emergency (such as severe chest pain, sudden numbness/paralysis, difficulty breathing, or severe trauma), please call emergency services (112 / 102) or proceed to the nearest hospital emergency room immediately.
+                  </p>
+                </div>
+              )}
+
+              {/* Interactive AI Triage Suggestion Card */}
+              {triageResult && (
+                <div className="p-4 rounded-xl bg-indigo-50/70 border border-indigo-200/80 space-y-3 animate-fade-in text-left">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-1.5 font-semibold text-indigo-950 text-sm">
+                      <IoSparklesOutline className="text-indigo-600 w-4 h-4" />
+                      AI Triage Recommendation
+                    </div>
+                    <span
+                      className={`text-xs px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                        triageResult.urgency === 'high'
+                          ? 'bg-red-100 text-red-800 border border-red-200'
+                          : triageResult.urgency === 'medium'
+                          ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                          : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                      }`}
+                    >
+                      {triageResult.urgency} Urgency
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between flex-wrap gap-3 pt-1">
+                    <div>
+                      <span className="text-xs text-slate-600">Suggested Department: </span>
+                      <span className="text-sm font-bold text-slate-900">
+                        {triageResult.suggestedDepartment}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleApplySuggestedDept}
+                      className="text-xs font-semibold px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors cursor-pointer shadow-xs flex items-center gap-1"
+                    >
+                      <IoShieldCheckmarkOutline className="w-3.5 h-3.5" />
+                      Select {triageResult.suggestedDepartment}
+                    </button>
+                  </div>
+
+                  <div className="pt-2 border-t border-indigo-200/60 text-[11px] text-slate-500 italic">
+                    {triageResult.disclaimer || 'AI suggestion only, not a medical diagnosis.'}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Step 2: Department */}
             <div>
               <Select
-                label="1. Medical Department"
+                label="2. Medical Department"
                 name="department"
                 value={selectedDepartment}
                 onChange={(e) => setSelectedDepartment(e.target.value)}
@@ -368,11 +523,11 @@ const BookAppointment = () => {
               </Select>
             </div>
 
-            {/* Step 2: Doctor */}
+            {/* Step 3: Doctor */}
             {selectedDepartment && (
               <div>
                 <Select
-                  label="2. Choose Doctor"
+                  label="3. Choose Doctor"
                   name="doctor"
                   value={selectedDoctorId}
                   onChange={(e) => setSelectedDoctorId(e.target.value)}
@@ -397,7 +552,7 @@ const BookAppointment = () => {
               </div>
             )}
 
-            {/* Step 3: Doctor Details Card */}
+            {/* Step 4: Doctor Details Card */}
             {selectedDoctor && (
               <div className="p-4 rounded-xl bg-blue-50/70 border border-blue-200/80 space-y-2 animate-fade-in text-sm text-left">
                 <div className="flex items-center gap-2 font-semibold text-blue-950">
@@ -429,11 +584,11 @@ const BookAppointment = () => {
               </div>
             )}
 
-            {/* Step 4: Date */}
+            {/* Step 5: Date */}
             {selectedDoctor && (
               <div>
                 <Input
-                  label="3. Appointment Date"
+                  label="4. Appointment Date"
                   type="date"
                   min={minDate}
                   value={appointmentDate}
@@ -449,11 +604,11 @@ const BookAppointment = () => {
               </div>
             )}
 
-            {/* Step 5: Time Slots */}
+            {/* Step 6: Time Slots */}
             {appointmentDate && timeSlots.length > 0 && (
               <div>
                 <label className="text-sm font-medium text-slate-700 block mb-2 text-left">
-                  4. Available Time Slots <span className="text-red-500">*</span>
+                  5. Available Time Slots <span className="text-red-500">*</span>
                 </label>
                 <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                   {timeSlots.map((slot) => {
@@ -474,27 +629,6 @@ const BookAppointment = () => {
                     );
                   })}
                 </div>
-              </div>
-            )}
-
-            {/* Step 6: Reason */}
-            {selectedDoctor && (
-              <div className="text-left">
-                <label className="text-sm font-medium text-slate-700 block mb-1.5">
-                  5. Reason for Visit / Symptoms <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  rows={3}
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  placeholder="Please briefly explain what issues you are experiencing..."
-                  required
-                  maxLength={500}
-                  className="w-full rounded-lg border border-slate-300 p-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
-                />
-                <span className="text-xs text-slate-400 block text-right mt-1">
-                  {reason.length}/500 characters
-                </span>
               </div>
             )}
 

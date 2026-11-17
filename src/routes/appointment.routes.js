@@ -3,6 +3,7 @@ const router = express.Router();
 
 const { protect } = require("../middleware/auth.middleware");
 const { authorizeRoles } = require("../middleware/role.middleware");
+const { triageLimiter } = require("../middleware/rateLimiter.middleware");
 
 const {
   bookAppointment,
@@ -12,6 +13,7 @@ const {
   getAllAppointments,
   getAppointmentById,
   getAppointmentWaitEstimate,
+  getTriageSuggestion,
   checkInAppointment,
   startConsultation,
   endConsultation,
@@ -19,6 +21,16 @@ const {
   rescheduleAppointment,
   updateAppointmentStatus,
 } = require("../controllers/appointment.Controller");
+
+// AI Symptom Triage suggestion (Patient role only, rate-limited to 10 req/min)
+// Registered explicitly before dynamic :id routes
+router.post(
+  "/triage",
+  protect,
+  authorizeRoles("patient"),
+  triageLimiter,
+  getTriageSuggestion
+);
 
 // Patient books scheduled appointment
 router.post("/", protect, authorizeRoles("patient"), bookAppointment);

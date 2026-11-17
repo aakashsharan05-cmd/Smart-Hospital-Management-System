@@ -276,20 +276,36 @@ const DoctorAppointments = () => {
                       {appt.patient?.phone || 'N/A'}
                     </TableCell>
                     <TableCell>
-                      <span className="text-xs text-slate-600 line-clamp-2 max-w-xs">
-                        {appt.reason || 'General checkup'}
-                      </span>
+                      <div className="flex flex-col items-start gap-1">
+                        <span className="text-xs text-slate-600 line-clamp-2 max-w-xs">
+                          {appt.reason || 'General checkup'}
+                        </span>
+                        {appt.aiTriageSuggestion?.urgency && (
+                          <span
+                            title={appt.aiTriageSuggestion.disclaimer || 'AI suggestion only, not a medical diagnosis.'}
+                            className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                              appt.aiTriageSuggestion.urgency === 'high'
+                                ? 'bg-red-100 text-red-700 border border-red-200'
+                                : appt.aiTriageSuggestion.urgency === 'medium'
+                                ? 'bg-amber-100 text-amber-700 border border-amber-200'
+                                : 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                            }`}
+                          >
+                            Triage: {appt.aiTriageSuggestion.urgency}
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col items-start gap-1">
                         <Badge status={appt.status} />
                         {appt.status === 'in-queue' && appt.predictedWaitMinutes !== null && appt.predictedWaitMinutes !== undefined && (
                           <span
-                            title={`${appt.waitPredictionSource === 'ml-model' ? 'Predicted by ML Model' : 'Estimated by Queue Formula'} (Approximate queue wait, not guaranteed. Typical margin ±${appt.typicalErrorMinutes ?? (appt.waitPredictionSource === 'ml-model' ? 2.4 : 5)} min)`}
+                            title={`${appt.waitPredictionSource === 'ml-model' ? 'Predicted by ML Model' : 'Estimated by Queue Formula'} (Approximate queue wait, not guaranteed. Typical prediction error: ${appt.typicalErrorMinutes ?? (appt.waitPredictionSource === 'ml-model' ? 2.4 : 5)} min)`}
                             className="text-[11px] font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200/80 flex items-center gap-1"
                           >
                             <IoTimeOutline className="w-3 h-3" />
-                            ~{appt.predictedWaitMinutes} min (±{appt.typicalErrorMinutes ?? (appt.waitPredictionSource === 'ml-model' ? 2.4 : 5)}m)
+                            ~{appt.predictedWaitMinutes} min (Typical error: {appt.typicalErrorMinutes ?? (appt.waitPredictionSource === 'ml-model' ? 2.4 : 5)}m)
                           </span>
                         )}
                       </div>
