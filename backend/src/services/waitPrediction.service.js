@@ -16,6 +16,7 @@ const {
   getKolkataHour,
   getKolkataDayRange,
 } = require("../utils/timezone");
+const { sortAppointmentsByQueueOrder } = require("../utils/queueOrder");
 
 /**
  * Predict wait time for a given queue length using ML service with 1.5s timeout,
@@ -128,11 +129,15 @@ const updateQueueWaitEstimates = async (doctorId) => {
     appointmentDate: { $gte: todayRange.start, $lte: todayRange.end },
   });
 
-  const waitingAppointments = await Appointment.find({
+  const rawWaiting = await Appointment.find({
     doctor: doctorIdStr,
     status: "in-queue",
     appointmentDate: { $gte: todayRange.start, $lte: todayRange.end },
-  }).sort({ queueNumber: 1, checkInTime: 1 });
+  });
+
+  // Queue order is arrival order: in-consultation first, then checkInTime ascending (tie-break queueNumber)
+  // Note: queueNumber is a token label, not queue order.
+  const waitingAppointments = sortAppointmentsByQueueOrder(rawWaiting);
 
   const updatedAppointments = [];
 

@@ -4,6 +4,7 @@ const User = require("../models/user.model");
 const Doctor = require("../models/doctor.model");
 const Appointment = require("../models/appointment.model");
 const { getKolkataDayRange } = require("../utils/timezone");
+const { sortAppointmentsByQueueOrder } = require("../utils/queueOrder");
 
 let io = null;
 
@@ -126,14 +127,17 @@ const emitQueueUpdate = async (doctorId) => {
     const doctorIdStr = doctorId._id ? doctorId._id.toString() : doctorId.toString();
     const todayRange = getKolkataDayRange(new Date());
 
-    const queue = await Appointment.find({
+    const rawQueue = await Appointment.find({
       doctor: doctorIdStr,
       status: { $in: ["in-queue", "in-consultation"] },
       appointmentDate: { $gte: todayRange.start, $lte: todayRange.end },
     })
       .populate("patient", "name phone email")
-      .populate("department", "name")
-      .sort({ queueNumber: 1, checkInTime: 1 });
+      .populate("department", "name");
+
+    // Queue order is arrival order: in-consultation first, then checkInTime ascending (tie-break queueNumber)
+    // Note: queueNumber is a token label, not queue order.
+    const queue = sortAppointmentsByQueueOrder(rawQueue);
 
     const staffPayload = {
       doctorId: doctorIdStr,
