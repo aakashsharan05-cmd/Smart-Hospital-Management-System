@@ -7,6 +7,7 @@ import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import Alert from '../../components/ui/Alert';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import useQueueSocket from '../../hooks/useQueueSocket';
 import {
   IoCalendarOutline,
   IoTimeOutline,
@@ -24,40 +25,35 @@ const PatientDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  const fetchData = async () => {
+    try {
+      setError('');
+      const [apptsRes, billsRes] = await Promise.all([
+        getMyAppointments(),
+        getMyBills(),
+      ]);
+      setAppointments(apptsRes.appointments || []);
+      setBills(billsRes.bills || []);
+    } catch (err) {
+      console.error('Error fetching dashboard data:', err);
+      setError(getErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    let isMounted = true;
-
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError('');
-        const [apptsRes, billsRes] = await Promise.all([
-          getMyAppointments(),
-          getMyBills(),
-        ]);
-
-        if (isMounted) {
-          setAppointments(apptsRes.appointments || []);
-          setBills(billsRes.bills || []);
-        }
-      } catch (err) {
-        console.error('Error fetching dashboard data:', err);
-        if (isMounted) {
-          setError(getErrorMessage(err));
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
     fetchData();
-
-    return () => {
-      isMounted = false;
-    };
   }, []);
+
+  const { isConnected: isLiveConnected } = useQueueSocket({
+    onQueueUpdate: () => {
+      fetchData();
+    },
+    onStatusChange: () => {
+      fetchData();
+    },
+  });
 
   if (loading) {
     return <LoadingSpinner size="lg" text="Loading your dashboard..." />;
@@ -93,7 +89,7 @@ const PatientDashboard = () => {
             your medical history anytime.
           </p>
 
-          <div className="mt-5 flex flex-wrap gap-3">
+          <div className="mt-5 flex flex-wrap items-center gap-3">
             <Link to="/patient/book-appointment">
               <Button
                 variant="secondary"
@@ -112,6 +108,12 @@ const PatientDashboard = () => {
                 View Medical Records
               </Button>
             </Link>
+            {isLiveConnected && (
+              <span className="inline-flex items-center gap-1.5 text-xs text-white bg-white/20 backdrop-blur-xs px-3 py-1.5 rounded-full font-medium">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                Live Updates Active
+              </span>
+            )}
           </div>
         </div>
       </div>

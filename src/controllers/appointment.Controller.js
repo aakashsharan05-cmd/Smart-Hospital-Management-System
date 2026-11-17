@@ -14,6 +14,10 @@ const { getNextQueueNumber } = require("../utils/counter");
 const {
   validateStatusTransition,
 } = require("../services/appointmentStatus.service");
+const {
+  emitAppointmentStatusChanged,
+  emitQueueUpdate,
+} = require("../services/socket.service");
 
 // Normalize a Date to its 30-minute slot start (e.g. 10:15 -> 10:00:00.000, 10:45 -> 10:30:00.000)
 const normalizeSlotStart = (date) => {
@@ -144,12 +148,15 @@ const bookAppointment = async (req, res) => {
 
     // Populate for response
     const populated = await Appointment.findById(appointment._id)
+      .populate("patient", "name email phone")
       .populate({
         path: "doctor",
         select: "specialization consultationFee userId",
         populate: { path: "userId", select: "name" },
       })
       .populate("department", "name");
+
+    emitAppointmentStatusChanged(populated);
 
     return res.status(201).json({
       success: true,
@@ -400,6 +407,9 @@ const cancelAppointment = async (req, res) => {
       cancellationReason?.trim() || "Cancelled by user";
     await appointment.save();
 
+    emitAppointmentStatusChanged(appointment);
+    emitQueueUpdate(appointment.doctor);
+
     return res.status(200).json({
       success: true,
       message: "Appointment cancelled successfully",
@@ -518,6 +528,9 @@ const rescheduleAppointment = async (req, res) => {
     appointment.status = "pending"; // Reset to pending after reschedule
     await appointment.save();
 
+    emitAppointmentStatusChanged(appointment);
+    emitQueueUpdate(appointment.doctor);
+
     return res.status(200).json({
       success: true,
       message: "Appointment rescheduled successfully",
@@ -593,6 +606,9 @@ const updateAppointmentStatus = async (req, res) => {
       appointment.notes = notes.trim();
     }
     await appointment.save();
+
+    emitAppointmentStatusChanged(appointment);
+    emitQueueUpdate(appointment.doctor);
 
     return res.status(200).json({
       success: true,
@@ -751,6 +767,9 @@ const createWalkInAppointment = async (req, res) => {
       })
       .populate("department", "name");
 
+    emitAppointmentStatusChanged(populated);
+    emitQueueUpdate(doctor._id);
+
     return res.status(201).json({
       success: true,
       message: "Walk-in appointment registered successfully and placed in queue",
@@ -807,6 +826,9 @@ const checkInAppointment = async (req, res) => {
         populate: { path: "userId", select: "name" },
       })
       .populate("department", "name");
+
+    emitAppointmentStatusChanged(populated);
+    emitQueueUpdate(appointment.doctor);
 
     return res.status(200).json({
       success: true,
@@ -871,6 +893,9 @@ const startConsultation = async (req, res) => {
       })
       .populate("department", "name");
 
+    emitAppointmentStatusChanged(populated);
+    emitQueueUpdate(appointment.doctor);
+
     return res.status(200).json({
       success: true,
       message: "Consultation started successfully",
@@ -933,6 +958,9 @@ const endConsultation = async (req, res) => {
         populate: { path: "userId", select: "name" },
       })
       .populate("department", "name");
+
+    emitAppointmentStatusChanged(populated);
+    emitQueueUpdate(appointment.doctor);
 
     return res.status(200).json({
       success: true,

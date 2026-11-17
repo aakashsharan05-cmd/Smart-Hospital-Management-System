@@ -24,6 +24,7 @@ import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
 import Modal from '../../components/ui/Modal';
 import Alert from '../../components/ui/Alert';
+import useQueueSocket from '../../hooks/useQueueSocket';
 import {
   IoCalendarOutline,
   IoCheckmarkOutline,
@@ -65,6 +66,15 @@ const DoctorAppointments = () => {
   useEffect(() => {
     fetchAppointments();
   }, []);
+
+  const { isConnected: isLiveConnected } = useQueueSocket({
+    onQueueUpdate: () => {
+      fetchAppointments();
+    },
+    onStatusChange: () => {
+      fetchAppointments();
+    },
+  });
 
   const handleStatusUpdate = async (id, newStatus) => {
     setActionLoadingId(id);
@@ -148,15 +158,23 @@ const DoctorAppointments = () => {
             Review appointments, update statuses, and prescribe medication
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          icon={IoRefreshOutline}
-          onClick={fetchAppointments}
-          isLoading={loading}
-        >
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2.5">
+          {isLiveConnected && (
+            <span className="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200 font-medium">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              Live Consultations
+            </span>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            icon={IoRefreshOutline}
+            onClick={fetchAppointments}
+            isLoading={loading}
+          >
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {error && <Alert type="error" message={error} onClose={() => setError('')} />}

@@ -23,6 +23,7 @@ import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
 import Modal from '../../components/ui/Modal';
 import Alert from '../../components/ui/Alert';
+import useQueueSocket from '../../hooks/useQueueSocket';
 import {
   IoCalendarOutline,
   IoCheckmarkOutline,
@@ -79,6 +80,15 @@ const ManageAppointments = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  const { isConnected: isLiveConnected } = useQueueSocket({
+    onQueueUpdate: () => {
+      fetchData();
+    },
+    onStatusChange: () => {
+      fetchData();
+    },
+  });
 
   const handleStatusUpdate = async (id, newStatus) => {
     setActionLoadingId(id);
@@ -172,6 +182,12 @@ const ManageAppointments = () => {
           </p>
         </div>
         <div className="flex items-center gap-2.5">
+          {isLiveConnected && (
+            <span className="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200 font-medium">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              Live Queue
+            </span>
+          )}
           <Button
             variant="primary"
             size="sm"

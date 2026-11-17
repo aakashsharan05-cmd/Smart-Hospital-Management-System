@@ -25,17 +25,26 @@ const validateEnv = () => {
 
 validateEnv();
 
+const http = require("http");
 const app = require("./src/app");
 const connectDB = require("./src/db/db");
+const { initSocket } = require("./src/services/socket.service");
+
+const server = http.createServer(app);
+initSocket(server);
 
 const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
   await connectDB();
 
-  app.listen(PORT, () => {
+  server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
   });
 };
 
-startServer();
+if (require.main === module) {
+  startServer();
+}
+
+module.exports = { app, server };
