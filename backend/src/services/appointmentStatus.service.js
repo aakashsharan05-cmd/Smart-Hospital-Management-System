@@ -14,6 +14,7 @@ const Appointment = require("../models/appointment.model");
 const Doctor = require("../models/doctor.model");
 const User = require("../models/user.model");
 const { getNextQueueNumber } = require("../utils/counter");
+const { getKolkataDateString } = require("../utils/timezone");
 const { emitAppointmentStatusChanged, emitQueueUpdate } = require("./socket.service");
 const { updateQueueWaitEstimates } = require("./waitPrediction.service");
 
@@ -125,6 +126,15 @@ const checkInAppointmentService = async (appointmentId) => {
   const check = validateStatusTransition(appointment.status, "in-queue");
   if (!check.allowed) {
     const err = new Error(check.message);
+    err.statusCode = 400;
+    throw err;
+  }
+
+  // Check-in allowed only if appointmentDate is today in Asia/Kolkata
+  const todayKolkata = getKolkataDateString(new Date());
+  const apptDateKolkata = getKolkataDateString(appointment.appointmentDate);
+  if (todayKolkata !== apptDateKolkata) {
+    const err = new Error("Check-in is only allowed on the scheduled appointment date (Asia/Kolkata today)");
     err.statusCode = 400;
     throw err;
   }

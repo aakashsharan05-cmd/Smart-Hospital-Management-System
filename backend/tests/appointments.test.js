@@ -9,7 +9,7 @@ const Appointment = require("../src/models/appointment.model");
 const { setupTestDb, teardownTestDb } = require("./testHelper");
 
 describe("Appointments, Concurrency & Ownership Tests", () => {
-  let docUser1, docUser2, doc1, doc2, dept, patientUser, p1Token, doc1Token, doc2Token;
+  let docUser1, docUser2, doc1, doc2, dept, patientUser, p1Token, doc1Token, doc2Token, recToken;
 
   beforeAll(async () => {
     await setupTestDb();
@@ -87,6 +87,21 @@ describe("Appointments, Concurrency & Ownership Tests", () => {
 
     doc2Token = jwt.sign(
       { userId: docUser2._id.toString(), role: "doctor" },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+
+    const recUser = await User.create({
+      name: "Receptionist Jane",
+      email: "rec.checkin@hospital.com",
+      password: hashedPassword,
+      phone: "+919888800099",
+      role: "receptionist",
+      isActive: true,
+    });
+
+    recToken = jwt.sign(
+      { userId: recUser._id.toString(), role: "receptionist" },
       process.env.JWT_SECRET,
       { expiresIn: "1h" }
     );
@@ -182,5 +197,50 @@ describe("Appointments, Concurrency & Ownership Tests", () => {
       .send({ status: "confirmed" });
     expect(resConfirm.status).toBe(200);
     expect(resConfirm.body.appointment.status).toBe("confirmed");
+  });
+
+  test("Check-in allowed only if appointmentDate is today in Asia/Kolkata", async () => {
+    // 1. Appointment scheduled for tomorrow
+    const tomorrow = new Date(Date.now() + 24 * 3600 * 1000);
+    const futureAppt = await Appointment.create({
+      patient: patientUser._id,
+      doctor: doc1._id,
+      department: dept._id,
+      appointmentDate: tomorrow,
+      slotStart: tomorrow,
+      status: "confirmed",
+      reason: "Tomorrow Checkup",
+      queueNumber: 3,
+    });
+
+    // Check-in on tomorrow's appointment fails with 400
+    const resFuture = await request(app)
+      .patch(`/api/appointments/${futureAppt._id}/check-in`)
+      .set("Authorization", `Bearer ${recToken}`);
+
+    expect(resFuture.status).toBe(400);
+    expect(resFuture.body.message).toMatch(/only allowed on the scheduled appointment date/i);
+
+    // 2. Appointment scheduled for today in Asia/Kolkata
+    const today = new Date();
+    const todayAppt = await Appointment.create({
+      patient: patientUser._id,
+      doctor: doc1._id,
+      department: dept._id,
+      appointmentDate: today,
+      slotStart: today,
+      status: "confirmed",
+      reason: "Today Checkup",
+      queueNumber: 4,
+    });
+
+    // Check-in on today's appointment succeeds with 200 and sets status to in-queue
+    const resToday = await request(app)
+      .patch(`/api/appointments/${todayAppt._id}/check-in`)
+      .set("Authorization", `Bearer ${recToken}`);
+
+    expect(resToday.status).toBe(200);
+    expect(resToday.body.appointment.status).toBe("in-queue");
+    expect(resToday.body.appointment.checkInTime).toBeDefined();
   });
 });
