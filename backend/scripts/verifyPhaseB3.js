@@ -54,10 +54,7 @@ async function runB3Tests() {
       department: dept._id,
       specialization: "Neurology",
       qualification: "MD, DM Neuro",
-<<<<<<< HEAD
-=======
       experience: 12,
->>>>>>> a10f7e4 (feat(realtime): implement authenticated socket.io queue updates, jwt-derived rooms, and live frontend hooks)
       consultationFee: 800,
       availableDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
       availableTime: { start: "00:00", end: "23:59" },
