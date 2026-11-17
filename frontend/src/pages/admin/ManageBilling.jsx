@@ -231,7 +231,7 @@ const ManageBilling = () => {
                     </TableCell>
                     <TableCell>Dr. {doctorName}</TableCell>
                     <TableCell className="font-bold text-slate-900">
-                      ${(bill.totalAmount || 0).toFixed(2)}
+                      ₹{(bill.totalAmount || 0).toFixed(2)}
                     </TableCell>
                     <TableCell>
                       <Badge status={bill.paymentStatus} />
@@ -285,7 +285,7 @@ const ManageBilling = () => {
               onClick={handleCreateSubmit}
               isLoading={submitting}
             >
-              Generate Bill (${Math.max(0, totalCalculated).toFixed(2)})
+              Generate Bill (₹{Math.max(0, totalCalculated).toFixed(2)})
             </Button>
           </>
         }
@@ -314,7 +314,7 @@ const ManageBilling = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
-              label="Consultation Fee ($)"
+              label="Consultation Fee (₹)"
               type="number"
               min="0"
               value={consultationFee}
@@ -322,21 +322,21 @@ const ManageBilling = () => {
               required
             />
             <Input
-              label="Medicine / Pharmacy Charges ($)"
+              label="Medicine / Pharmacy Charges (₹)"
               type="number"
               min="0"
               value={medicineCharges}
               onChange={(e) => setMedicineCharges(e.target.value)}
             />
             <Input
-              label="Other Hospital Charges ($)"
+              label="Other Hospital Charges (₹)"
               type="number"
               min="0"
               value={otherCharges}
               onChange={(e) => setOtherCharges(e.target.value)}
             />
             <Input
-              label="Discount / Waiver ($)"
+              label="Discount / Waiver (₹)"
               type="number"
               min="0"
               value={discount}
@@ -359,7 +359,7 @@ const ManageBilling = () => {
           <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex justify-between items-center text-sm font-semibold text-slate-800">
             <span>Net Calculated Total:</span>
             <span className="text-lg text-[#0E382C] font-bold">
-              ${Math.max(0, totalCalculated).toFixed(2)}
+              ₹{Math.max(0, totalCalculated).toFixed(2)}
             </span>
           </div>
         </form>
@@ -370,7 +370,7 @@ const ManageBilling = () => {
         isOpen={payModalOpen}
         onClose={() => setPayModalOpen(false)}
         title="Mark Bill as Paid"
-        subtitle={`Invoice: ${selectedBillToPay?.invoiceNumber || ''} - Total: $${selectedBillToPay?.totalAmount || 0}`}
+        subtitle={`Invoice: ${selectedBillToPay?.invoiceNumber || ''} - Total: ₹${selectedBillToPay?.totalAmount || 0}`}
         footer={
           <>
             <Button

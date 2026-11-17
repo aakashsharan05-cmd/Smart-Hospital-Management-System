@@ -241,7 +241,7 @@ const ManagePharmacy = () => {
                       </span>
                     </TableCell>
                     <TableCell className="font-semibold text-slate-900">
-                      ${(med.price || 0).toFixed(2)}
+                      ₹{(med.price || 0).toFixed(2)}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -361,7 +361,7 @@ const ManagePharmacy = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Input
-              label="Unit Price ($)"
+              label="Unit Price (₹)"
               type="number"
               step="0.01"
               min="0"

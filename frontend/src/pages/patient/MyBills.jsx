@@ -79,21 +79,21 @@ const MyBills = () => {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
         <StatCard
           title="Total Billed"
-          value={`$${totalBilled.toFixed(2)}`}
+          value={`₹${totalBilled.toFixed(2)}`}
           subtitle={`${bills.length} invoices generated`}
           icon={IoReceiptOutline}
           color="blue"
         />
         <StatCard
           title="Total Settled"
-          value={`$${totalPaid.toFixed(2)}`}
+          value={`₹${totalPaid.toFixed(2)}`}
           subtitle="Paid in full"
           icon={IoCheckmarkCircleOutline}
           color="emerald"
         />
         <StatCard
           title="Pending Due"
-          value={`$${totalPending.toFixed(2)}`}
+          value={`₹${totalPending.toFixed(2)}`}
           subtitle="Awaiting settlement"
           icon={IoCashOutline}
           color="amber"
@@ -146,14 +146,14 @@ const MyBills = () => {
                     <TableCell>
                       <span className="font-medium text-slate-900">Dr. {doctorName}</span>
                     </TableCell>
-                    <TableCell>${(bill.consultationFee || 0).toFixed(2)}</TableCell>
-                    <TableCell>${(bill.medicineCharges || 0).toFixed(2)}</TableCell>
-                    <TableCell>${(bill.otherCharges || 0).toFixed(2)}</TableCell>
+                    <TableCell>₹{(bill.consultationFee || 0).toFixed(2)}</TableCell>
+                    <TableCell>₹{(bill.medicineCharges || 0).toFixed(2)}</TableCell>
+                    <TableCell>₹{(bill.otherCharges || 0).toFixed(2)}</TableCell>
                     <TableCell className="text-emerald-600">
-                      -${(bill.discount || 0).toFixed(2)}
+                      -₹{(bill.discount || 0).toFixed(2)}
                     </TableCell>
                     <TableCell className="font-bold text-slate-900">
-                      ${(bill.totalAmount || 0).toFixed(2)}
+                      ₹{(bill.totalAmount || 0).toFixed(2)}
                     </TableCell>
                     <TableCell>
                       <Badge status={bill.paymentStatus} />

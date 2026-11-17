@@ -346,7 +346,7 @@ const BookAppointment = () => {
               <div className="flex justify-between items-center">
                 <span className="text-sm text-slate-500">Consultation Fee</span>
                 <span className="text-sm font-bold text-slate-900">
-                  ${selectedDoctor?.consultationFee}
+                  ₹{selectedDoctor?.consultationFee}
                 </span>
               </div>
               {successData.queueNumber && (
@@ -595,7 +595,7 @@ const BookAppointment = () => {
                   </div>
                   <div className="flex items-center gap-1">
                     <IoCashOutline className="text-[#526B62]" />
-                    <span className="font-semibold text-[#11261F]">Fee: </span>$
+                    <span className="font-semibold text-[#11261F]">Fee: </span>₹
                     {selectedDoctor.consultationFee}
                   </div>
                   <div className="flex items-center gap-1">

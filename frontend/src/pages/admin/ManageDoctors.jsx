@@ -274,7 +274,7 @@ const ManageDoctors = () => {
                     <TableCell>{deptName}</TableCell>
                     <TableCell>{doc.experience} yrs</TableCell>
                     <TableCell className="font-semibold text-slate-900">
-                      ${doc.consultationFee}
+                      ₹{doc.consultationFee}
                     </TableCell>
                     <TableCell>
                       <Badge
@@ -371,7 +371,7 @@ const ManageDoctors = () => {
                   Consultation Fee
                 </span>
                 <p className="font-bold text-slate-900 mt-0.5">
-                  ${viewingDoctor.consultationFee}
+                  ₹{viewingDoctor.consultationFee}
                 </p>
               </div>
             </div>
@@ -479,7 +479,7 @@ const ManageDoctors = () => {
               required
             />
             <Input
-              label="Consultation Fee ($)"
+              label="Consultation Fee (₹)"
               type="number"
               min="0"
               value={formData.consultationFee}
