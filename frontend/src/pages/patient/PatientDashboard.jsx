@@ -212,7 +212,18 @@ const PatientDashboard = () => {
                           })}
                         </div>
                       </div>
-                      <Badge status={appt.status} />
+                      <div className="flex flex-col items-end gap-1">
+                        <Badge status={appt.status} />
+                        {appt.status === 'in-queue' && appt.predictedWaitMinutes !== null && appt.predictedWaitMinutes !== undefined && (
+                          <span
+                            title={appt.waitPredictionSource === 'ml-model' ? 'Predicted by AI Model' : 'Estimated by Queue Formula'}
+                            className="text-[11px] font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200/80 flex items-center gap-1"
+                          >
+                            <IoTimeOutline className="w-3 h-3" />
+                            ~{appt.predictedWaitMinutes}m wait
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );

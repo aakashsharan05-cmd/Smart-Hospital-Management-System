@@ -15,6 +15,7 @@ const Doctor = require("../models/doctor.model");
 const User = require("../models/user.model");
 const { getNextQueueNumber } = require("../utils/counter");
 const { emitAppointmentStatusChanged, emitQueueUpdate } = require("./socket.service");
+const { updateQueueWaitEstimates } = require("./waitPrediction.service");
 
 const LEGAL_TRANSITIONS = {
   pending: ["confirmed", "rejected", "cancelled"],
@@ -132,6 +133,7 @@ const checkInAppointmentService = async (appointmentId) => {
   appointment.checkInTime = new Date();
   await appointment.save();
 
+  await updateQueueWaitEstimates(appointment.doctor);
   const populated = await populateAppointment(appointment._id);
 
   // Emit only AFTER DB write succeeds
@@ -167,8 +169,10 @@ const startConsultationService = async ({ appointmentId, doctorProfileId }) => {
 
   appointment.status = "in-consultation";
   appointment.consultationStartTime = new Date();
+  appointment.predictedWaitMinutes = 0;
   await appointment.save();
 
+  await updateQueueWaitEstimates(appointment.doctor);
   const populated = await populateAppointment(appointment._id);
 
   // Emit only AFTER DB write succeeds
@@ -204,11 +208,13 @@ const endConsultationService = async ({ appointmentId, doctorProfileId, consulta
 
   appointment.status = "completed";
   appointment.consultationEndTime = new Date();
+  appointment.predictedWaitMinutes = 0;
   if (consultationNotes) {
     appointment.notes = consultationNotes.trim();
   }
   await appointment.save();
 
+  await updateQueueWaitEstimates(appointment.doctor);
   const populated = await populateAppointment(appointment._id);
 
   // Emit only AFTER DB write succeeds
@@ -238,8 +244,10 @@ const cancelAppointmentService = async ({ appointmentId, cancellationReason }) =
 
   appointment.status = "cancelled";
   appointment.cancellationReason = cancellationReason?.trim() || "Cancelled by user";
+  appointment.predictedWaitMinutes = 0;
   await appointment.save();
 
+  await updateQueueWaitEstimates(appointment.doctor);
   const populated = await populateAppointment(appointment._id);
 
   // Emit only AFTER DB write succeeds
@@ -401,6 +409,9 @@ const createWalkInAppointmentService = async ({
       await session.endSession();
     }
   }
+
+  // Update dynamic wait estimates for all queue appointments of this doctor
+  await updateQueueWaitEstimates(doctor._id);
 
   // Populate AFTER transaction commit has succeeded
   const populated = await populateAppointment(createdAppointmentId);

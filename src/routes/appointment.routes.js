@@ -11,6 +11,7 @@ const {
   getDoctorAppointments,
   getAllAppointments,
   getAppointmentById,
+  getAppointmentWaitEstimate,
   checkInAppointment,
   startConsultation,
   endConsultation,
@@ -72,6 +73,9 @@ router.get(
   authorizeRoles("admin", "receptionist"),
   getAllAppointments
 );
+
+// Get appointment wait-time estimate
+router.get("/:id/wait-estimate", protect, getAppointmentWaitEstimate);
 
 // Any authenticated user can view a single appointment (access-controlled inside)
 router.get("/:id", protect, getAppointmentById);

@@ -757,6 +757,80 @@ const endConsultation = async (req, res) => {
   }
 };
 
+// ── Get appointment wait time estimate ────────────────────
+const getAppointmentWaitEstimate = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid appointment ID",
+      });
+    }
+
+    const appointment = await Appointment.findById(id).populate("doctor", "userId");
+    if (!appointment) {
+      return res.status(404).json({
+        success: false,
+        message: "Appointment not found",
+      });
+    }
+
+    const { userId, role } = req.user;
+    if (role === "patient" && appointment.patient.toString() !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only view wait estimates for your own appointments",
+      });
+    }
+
+    if (role === "doctor") {
+      const doctor = await Doctor.findOne({ userId });
+      if (!doctor || appointment.doctor?._id.toString() !== doctor._id.toString()) {
+        return res.status(403).json({
+          success: false,
+          message: "You can only view wait estimates for your own patients",
+        });
+      }
+    }
+
+    let queuePosition = 0;
+    if (appointment.status === "in-queue") {
+      const todayRange = getKolkataDayRange(appointment.appointmentDate || new Date());
+      const inConsultCount = await Appointment.countDocuments({
+        doctor: appointment.doctor._id || appointment.doctor,
+        status: "in-consultation",
+        appointmentDate: { $gte: todayRange.start, $lte: todayRange.end },
+      });
+      const aheadCount = await Appointment.countDocuments({
+        doctor: appointment.doctor._id || appointment.doctor,
+        status: "in-queue",
+        appointmentDate: { $gte: todayRange.start, $lte: todayRange.end },
+        queueNumber: { $lt: appointment.queueNumber },
+      });
+      queuePosition = inConsultCount + aheadCount + 1;
+    } else if (appointment.status === "in-consultation") {
+      queuePosition = 1;
+    }
+
+    return res.status(200).json({
+      success: true,
+      appointmentId: appointment._id,
+      status: appointment.status,
+      queueNumber: appointment.queueNumber || null,
+      queuePosition,
+      predictedWaitMinutes: appointment.predictedWaitMinutes || 0,
+      waitPredictionSource: appointment.waitPredictionSource || "fallback-formula",
+    });
+  } catch (error) {
+    console.error("Get wait estimate error:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
+
 module.exports = {
   bookAppointment,
   createWalkInAppointment,
@@ -764,6 +838,7 @@ module.exports = {
   getDoctorAppointments,
   getAllAppointments,
   getAppointmentById,
+  getAppointmentWaitEstimate,
   checkInAppointment,
   startConsultation,
   endConsultation,

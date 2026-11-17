@@ -67,6 +67,40 @@ const isTimeWithinRange = (timeStr, startTimeStr, endTimeStr) => {
   return timeStr >= start && timeStr <= end;
 };
 
+/**
+ * Converts date to model day of week (0=Monday .. 6=Sunday) in Asia/Kolkata
+ */
+const toModelDayOfWeek = (date) => {
+  const dayName = new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    timeZone: TIMEZONE,
+  }).format(new Date(date));
+
+  const dayMap = {
+    Mon: 0,
+    Tue: 1,
+    Wed: 2,
+    Thu: 3,
+    Fri: 4,
+    Sat: 5,
+    Sun: 6,
+  };
+  return dayMap[dayName] !== undefined ? dayMap[dayName] : 0;
+};
+
+/**
+ * Get hour (0-23) in Asia/Kolkata
+ */
+const getKolkataHour = (date) => {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
+    hour12: false,
+    timeZone: TIMEZONE,
+  }).formatToParts(new Date(date));
+  const hourPart = parts.find((p) => p.type === "hour");
+  return hourPart ? parseInt(hourPart.value, 10) : new Date(date).getHours();
+};
+
 module.exports = {
   TIMEZONE,
   getKolkataWeekday,
@@ -74,4 +108,6 @@ module.exports = {
   getKolkataDateString,
   getKolkataDayRange,
   isTimeWithinRange,
+  toModelDayOfWeek,
+  getKolkataHour,
 };

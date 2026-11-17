@@ -209,6 +209,11 @@ export const endConsultation = async (id) => {
   return response.data;
 };
 
+export const getAppointmentWaitEstimate = async (id) => {
+  const response = await api.get(`/api/appointments/${id}/wait-estimate`);
+  return response.data;
+};
+
 /* =========================================================================
    PRESCRIPTIONS API
    ========================================================================= */
