@@ -22,6 +22,13 @@ const validateEnv = () => {
     missing.forEach((err) => console.error(`  - ${err}`));
     process.exit(1);
   }
+
+  // Clear startup warning if Gemini key is missing
+  if (!process.env.GEMINI_API_KEY || !process.env.GEMINI_API_KEY.trim()) {
+    console.warn(
+      "[WARNING] GEMINI_API_KEY is not configured. AI symptom triage service will operate in local keyword fallback mode."
+    );
+  }
 };
 
 validateEnv();

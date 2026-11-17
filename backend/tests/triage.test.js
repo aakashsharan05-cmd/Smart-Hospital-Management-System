@@ -316,4 +316,44 @@ describe("AI Symptom Triage, Privacy & Fallback Tests", () => {
     expect(displayedTriage).toBeNull();
     expect(isLoading).toBe(false);
   });
+
+  test("Gemini API key is transmitted in x-goog-api-key header and never in URL query parameters", async () => {
+    process.env.GEMINI_API_KEY = "test-secret-gemini-key-999";
+    process.env.GEMINI_MODEL = "gemini-1.5-flash";
+
+    const fetchSpy = jest.spyOn(global, "fetch").mockImplementationOnce(async (url, options) => {
+      expect(url).not.toContain("key=");
+      expect(url).not.toContain("test-secret-gemini-key-999");
+      expect(url).toBe("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent");
+      expect(options.headers["x-goog-api-key"]).toBe("test-secret-gemini-key-999");
+
+      return {
+        ok: true,
+        json: async () => ({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      suggestedDepartment: "Cardiology",
+                      urgency: "high",
+                    }),
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+      };
+    });
+
+    const result = await triageSymptoms("Severe chest pain and irregular heartbeat");
+    expect(result.suggestedDepartment).toBe("Cardiology");
+    expect(result.urgency).toBe("high");
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    fetchSpy.mockRestore();
+    delete process.env.GEMINI_API_KEY;
+  });
 });

@@ -301,7 +301,7 @@ const triageSymptoms = async (symptomText) => {
     return getRuleBasedTriage(cleanedText, activeDepartmentNames);
   }
 
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
 
   // Strict clinical triage prompt - ONLY symptoms, ZERO PII
   const prompt = [
@@ -336,6 +336,8 @@ const triageSymptoms = async (symptomText) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "x-goog-api-key": apiKey.trim(),
+        Connection: "close",
       },
       body: JSON.stringify(requestBody),
       signal: controller.signal,
