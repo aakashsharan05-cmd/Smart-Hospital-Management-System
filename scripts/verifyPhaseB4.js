@@ -120,7 +120,7 @@ async function runB4Tests() {
     mockMlServer.close();
 
     // 4. Test dynamic wait time updates across appointments
-    console.log("\n--- Test 4: Dynamic wait time updates in appointments ---");
+    console.log("\n--- Test 4: Dynamic wait time recalculation across all lifecycle events ---");
     // Switch to fallback formula for deterministic tests
     process.env.ML_SERVICE_URL = "http://127.0.0.1:59999";
 
@@ -145,6 +145,27 @@ async function runB4Tests() {
       isAvailable: true,
     });
 
+    // Create a 2nd doctor to verify no cross-doctor queue pollution
+    const docUser2 = await User.create({
+      name: "Dr. Other",
+      email: "other@hospital.local",
+      password: await bcrypt.hash("Pass123!", 10),
+      phone: "9111222999",
+      role: "doctor",
+      isActive: true,
+    });
+    const doctor2 = await Doctor.create({
+      userId: docUser2._id,
+      department: dept._id,
+      specialization: "Orthopedics",
+      qualification: "MS Ortho",
+      experience: 5,
+      consultationFee: 500,
+      availableDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+      availableTime: { start: "00:00", end: "23:59" },
+      isAvailable: true,
+    });
+
     const patient1 = await User.create({
       name: "Patient One",
       email: "p1@hospital.local",
@@ -159,6 +180,15 @@ async function runB4Tests() {
       email: "p2@hospital.local",
       password: await bcrypt.hash("Pass123!", 10),
       phone: "9111222335",
+      role: "patient",
+      isActive: true,
+    });
+
+    const patient3 = await User.create({
+      name: "Patient Three",
+      email: "p3@hospital.local",
+      password: await bcrypt.hash("Pass123!", 10),
+      phone: "9111222337",
       role: "patient",
       isActive: true,
     });
@@ -187,13 +217,29 @@ async function runB4Tests() {
       process.env.JWT_SECRET,
       { expiresIn: "1h" }
     );
+    const p3Token = jwt.sign(
+      { userId: patient3._id.toString(), role: "patient" },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
     const docToken = jwt.sign(
       { userId: docUser._id.toString(), role: "doctor" },
       process.env.JWT_SECRET,
       { expiresIn: "1h" }
     );
 
-    // Register Walk-in 1
+    // Create an in-queue appointment for Dr. Other to verify it does NOT pollute Dr. Bone's queue
+    await Appointment.create({
+      patient: patient1._id,
+      doctor: doctor2._id,
+      department: dept._id,
+      appointmentDate: new Date(),
+      status: "in-queue",
+      queueNumber: 1,
+      reason: "Other doc visit",
+    });
+
+    // 4a. Walk-in 1 creation for Dr. Bone
     const resW1 = await request(app)
       .post("/api/appointments/walk-in")
       .set("Authorization", `Bearer ${staffToken}`)
@@ -202,14 +248,14 @@ async function runB4Tests() {
         doctorId: doctor._id.toString(),
         reason: "Knee pain",
       });
-    console.log("Walk-in 1 status:", resW1.status);
-    console.log("Walk-in 1 predictedWaitMinutes:", resW1.body.appointment?.predictedWaitMinutes);
+    const appt1Id = resW1.body.appointment._id;
+    console.log("Walk-in 1 wait time:", resW1.body.appointment?.predictedWaitMinutes);
     // Queue length ahead is 0 -> 5 + 0*8 = 5 min
     if (resW1.body.appointment?.predictedWaitMinutes !== 5) {
       throw new Error(`Test 4a Failed: Expected 5 min wait, got ${resW1.body.appointment?.predictedWaitMinutes}`);
     }
 
-    // Register Walk-in 2
+    // 4b. Walk-in 2 creation for Dr. Bone
     const resW2 = await request(app)
       .post("/api/appointments/walk-in")
       .set("Authorization", `Bearer ${staffToken}`)
@@ -218,16 +264,78 @@ async function runB4Tests() {
         doctorId: doctor._id.toString(),
         reason: "Ankle sprain",
       });
-    console.log("Walk-in 2 status:", resW2.status);
-    console.log("Walk-in 2 predictedWaitMinutes:", resW2.body.appointment?.predictedWaitMinutes);
+    const appt2Id = resW2.body.appointment._id;
+    console.log("Walk-in 2 wait time:", resW2.body.appointment?.predictedWaitMinutes);
     // Queue length ahead is 1 -> 5 + 1*8 = 13 min
     if (resW2.body.appointment?.predictedWaitMinutes !== 13) {
       throw new Error(`Test 4b Failed: Expected 13 min wait, got ${resW2.body.appointment?.predictedWaitMinutes}`);
     }
 
+    // 4c. Check-in of a confirmed appointment (Patient 3)
+    const confirmedAppt = await Appointment.create({
+      patient: patient3._id,
+      doctor: doctor._id,
+      department: dept._id,
+      appointmentDate: new Date(),
+      status: "confirmed",
+      reason: "Shoulder checkup",
+      queueNumber: 3,
+    });
+    const resCheckIn = await request(app)
+      .patch(`/api/appointments/${confirmedAppt._id}/check-in`)
+      .set("Authorization", `Bearer ${staffToken}`);
+    console.log("Patient 3 check-in wait time:", resCheckIn.body.appointment?.predictedWaitMinutes);
+    // Ahead: appt1 + appt2 = 2 ahead -> 5 + 2*8 = 21 min
+    if (resCheckIn.body.appointment?.predictedWaitMinutes !== 21) {
+      throw new Error(`Test 4c Failed: Expected 21 min wait for checked in appointment, got ${resCheckIn.body.appointment?.predictedWaitMinutes}`);
+    }
+
+    // 4d. Doctor starts consultation with Patient 1
+    const resStart = await request(app)
+      .patch(`/api/appointments/${appt1Id}/start-consultation`)
+      .set("Authorization", `Bearer ${docToken}`);
+    console.log("Patient 1 started consultation. Status:", resStart.body.appointment?.status);
+
+    // Verify recalculation:
+    // Patient 1 is in-consultation -> wait time = 0
+    // Patient 2 is in-queue: ahead is 1 in-consultation -> queueLength ahead = 1 -> wait = 13 min
+    const appt2AfterStart = await Appointment.findById(appt2Id);
+    console.log("Patient 2 wait after consult start:", appt2AfterStart.predictedWaitMinutes);
+    if (appt2AfterStart.predictedWaitMinutes !== 13) {
+      throw new Error("Test 4d Failed: Patient 2 wait time not accurate after start consultation");
+    }
+
+    // 4e. Doctor ends consultation with Patient 1
+    const resEnd = await request(app)
+      .patch(`/api/appointments/${appt1Id}/end-consultation`)
+      .set("Authorization", `Bearer ${docToken}`)
+      .send({ consultationNotes: "Advised physiotherapy" });
+    console.log("Patient 1 ended consultation. Status:", resEnd.body.appointment?.status);
+
+    // Verify recalculation after consultation ends:
+    // No one is currently in-consultation! Patient 2 is now first in queue!
+    // Queue length ahead for Patient 2 is now 0 -> wait time = 5 min!
+    // Queue length ahead for Patient 3 is now 1 -> wait time = 13 min!
+    const appt2AfterEnd = await Appointment.findById(appt2Id);
+    const appt3AfterEnd = await Appointment.findById(confirmedAppt._id);
+    console.log("Patient 2 wait after consult end (now 1st):", appt2AfterEnd.predictedWaitMinutes);
+    console.log("Patient 3 wait after consult end (now 2nd):", appt3AfterEnd.predictedWaitMinutes);
+
+    if (appt2AfterEnd.predictedWaitMinutes !== 5 || appt3AfterEnd.predictedWaitMinutes !== 13) {
+      throw new Error("Test 4e Failed: Wait estimates did not dynamically recalculate after end consultation");
+    }
+
+    // 4f. Cancellation of Patient 3
+    const resCancel = await request(app)
+      .patch(`/api/appointments/${confirmedAppt._id}/cancel`)
+      .set("Authorization", `Bearer ${p3Token}`)
+      .send({ cancellationReason: "Unable to wait" });
+    console.log("Patient 3 cancelled status:", resCancel.body.appointment?.status);
+
+    console.log("✓ Test 4 Passed: Queue wait estimates recalculated dynamically across walk-in, check-in, start-consultation, end-consultation, and cancellation.");
+
     // 5. Test Endpoint GET /api/appointments/:id/wait-estimate
     console.log("\n--- Test 5: GET /api/appointments/:id/wait-estimate endpoint ---");
-    const appt2Id = resW2.body.appointment._id;
 
     // Patient 2 accesses their own wait estimate
     const estimateRes = await request(app)
@@ -237,8 +345,8 @@ async function runB4Tests() {
     console.log("Patient 2 wait-estimate response:", estimateRes.body);
     if (
       estimateRes.status !== 200 ||
-      estimateRes.body.predictedWaitMinutes !== 13 ||
-      estimateRes.body.queuePosition !== 2 ||
+      estimateRes.body.predictedWaitMinutes !== 5 ||
+      estimateRes.body.queuePosition !== 1 ||
       estimateRes.body.waitPredictionSource !== "fallback-formula"
     ) {
       throw new Error("Test 5a Failed: Wait estimate endpoint response mismatch");

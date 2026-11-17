@@ -796,18 +796,30 @@ const getAppointmentWaitEstimate = async (req, res) => {
 
     let queuePosition = 0;
     if (appointment.status === "in-queue") {
+      const doctorId = appointment.doctor._id || appointment.doctor;
       const todayRange = getKolkataDayRange(appointment.appointmentDate || new Date());
+
+      // Count appointments currently with the same doctor on the same Kolkata calendar day
       const inConsultCount = await Appointment.countDocuments({
-        doctor: appointment.doctor._id || appointment.doctor,
+        doctor: doctorId,
         status: "in-consultation",
         appointmentDate: { $gte: todayRange.start, $lte: todayRange.end },
       });
-      const aheadCount = await Appointment.countDocuments({
-        doctor: appointment.doctor._id || appointment.doctor,
+
+      // Count appointments ahead in queue for the same doctor and same Kolkata day
+      const aheadFilter = {
+        doctor: doctorId,
         status: "in-queue",
         appointmentDate: { $gte: todayRange.start, $lte: todayRange.end },
-        queueNumber: { $lt: appointment.queueNumber },
-      });
+      };
+
+      if (appointment.queueNumber) {
+        aheadFilter.queueNumber = { $lt: appointment.queueNumber };
+      } else if (appointment.checkInTime) {
+        aheadFilter.checkInTime = { $lt: appointment.checkInTime };
+      }
+
+      const aheadCount = await Appointment.countDocuments(aheadFilter);
       queuePosition = inConsultCount + aheadCount + 1;
     } else if (appointment.status === "in-consultation") {
       queuePosition = 1;
