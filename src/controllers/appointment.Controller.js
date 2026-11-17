@@ -7,6 +7,7 @@ const {
   getKolkataDayRange,
   isTimeWithinRange,
 } = require("../utils/timezone");
+const { getNextQueueNumber } = require("../utils/counter");
 
 // Normalize a Date to its 30-minute slot start (e.g. 10:15 -> 10:00:00.000, 10:45 -> 10:30:00.000)
 const normalizeSlotStart = (date) => {
@@ -120,14 +121,8 @@ const bookAppointment = async (req, res) => {
       });
     }
 
-    // Calculate queue number for this doctor on this date (Asia/Kolkata day boundary)
-    const { start: dayStart, end: dayEnd } = getKolkataDayRange(slotStart);
-
-    const appointmentsToday = await Appointment.countDocuments({
-      doctor: doctor._id,
-      appointmentDate: { $gte: dayStart, $lte: dayEnd },
-      status: { $nin: ["cancelled", "rejected"] },
-    });
+    // Assign atomic queue number per doctor per day (Asia/Kolkata date)
+    const queueNumber = await getNextQueueNumber(doctor._id, slotStart);
 
     // Create appointment with normalized slot
     const appointment = await Appointment.create({
@@ -138,7 +133,7 @@ const bookAppointment = async (req, res) => {
       slotStart,
       isSlotActive: true,
       reason: reason.trim(),
-      queueNumber: appointmentsToday + 1,
+      queueNumber,
     });
 
     // Populate for response
