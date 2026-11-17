@@ -1,6 +1,9 @@
 const Appointment = require("../models/appointment.model");
 const Doctor = require("../models/doctor.model");
+const User = require("../models/user.model");
 const mongoose = require("mongoose");
+const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 const {
   getKolkataWeekday,
   getKolkataTimeString,
@@ -605,12 +608,356 @@ const updateAppointmentStatus = async (req, res) => {
   }
 };
 
+// ── Walk-in appointment registration (Receptionist/Admin) ─
+const createWalkInAppointment = async (req, res) => {
+  const session = await mongoose.startSession();
+  try {
+    const { patientId, patient, doctorId, reason } = req.body;
+
+    if (!doctorId || !mongoose.isValidObjectId(doctorId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid doctorId is required",
+      });
+    }
+
+    if (!reason || typeof reason !== "string" || !reason.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Reason is required for walk-in appointment",
+      });
+    }
+
+    const doctor = await Doctor.findById(doctorId);
+    if (!doctor || !doctor.isAvailable) {
+      return res.status(400).json({
+        success: false,
+        message: "Doctor not found or currently unavailable",
+      });
+    }
+
+    let resolvedPatientId = null;
+
+    if (patientId) {
+      if (!mongoose.isValidObjectId(patientId)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid patientId format",
+        });
+      }
+      const existingUser = await User.findById(patientId);
+      if (!existingUser) {
+        return res.status(404).json({
+          success: false,
+          message: "Patient not found with provided ID",
+        });
+      }
+      resolvedPatientId = existingUser._id;
+    } else if (patient && typeof patient === "object") {
+      const { name, phone, email } = patient;
+      if (!name || !name.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: "Patient name is required",
+        });
+      }
+      if (!phone || !phone.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: "Patient phone is required",
+        });
+      }
+
+      const trimmedPhone = phone.trim();
+
+      // B2 requirement: Find existing patient by phone BEFORE creating new user (no duplicates)
+      const existingByPhone = await User.findOne({ phone: trimmedPhone });
+      if (existingByPhone) {
+        resolvedPatientId = existingByPhone._id;
+      } else {
+        // Generate non-routable placeholder email if email not provided
+        let patientEmail = email?.trim().toLowerCase();
+        if (!patientEmail) {
+          const cleanPhone = trimmedPhone.replace(/[^0-9]/g, "");
+          const randomSuffix = crypto.randomBytes(4).toString("hex");
+          patientEmail = `walkin-${cleanPhone || "user"}-${randomSuffix}@hospital.local`;
+        } else {
+          const existingByEmail = await User.findOne({ email: patientEmail });
+          if (existingByEmail) {
+            return res.status(409).json({
+              success: false,
+              message: "A user with this email already exists",
+            });
+          }
+        }
+
+        // B2 requirement: Random crypto.randomBytes value, hashed, never shown or logged
+        const randomPassword = crypto.randomBytes(24).toString("hex");
+        const hashedPassword = await bcrypt.hash(randomPassword, 10);
+
+        let createdUser;
+        await session.withTransaction(async () => {
+          const [newUser] = await User.create(
+            [
+              {
+                name: name.trim(),
+                email: patientEmail,
+                password: hashedPassword,
+                phone: trimmedPhone,
+                role: "patient",
+                isActive: true,
+              },
+            ],
+            { session }
+          );
+          createdUser = newUser;
+        });
+        resolvedPatientId = createdUser._id;
+      }
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: "Either patientId or patient { name, phone } must be provided",
+      });
+    }
+
+    const now = new Date();
+    const slotStart = normalizeSlotStart(now);
+
+    // Atomic queue number for today
+    const queueNumber = await getNextQueueNumber(doctor._id, slotStart);
+
+    const appointment = await Appointment.create({
+      patient: resolvedPatientId,
+      doctor: doctor._id,
+      department: doctor.department,
+      appointmentDate: slotStart,
+      slotStart,
+      appointmentType: "walk-in",
+      status: "in-queue",
+      checkInTime: now,
+      isSlotActive: false,
+      reason: reason.trim(),
+      symptomText: reason.trim(),
+      queueNumber,
+    });
+
+    const populated = await Appointment.findById(appointment._id)
+      .populate("patient", "name email phone")
+      .populate({
+        path: "doctor",
+        select: "specialization consultationFee userId",
+        populate: { path: "userId", select: "name email phone" },
+      })
+      .populate("department", "name");
+
+    return res.status(201).json({
+      success: true,
+      message: "Walk-in appointment registered successfully and placed in queue",
+      appointment: populated,
+    });
+  } catch (error) {
+    console.error("Create walk-in error:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to create walk-in appointment",
+    });
+  } finally {
+    await session.endSession();
+  }
+};
+
+// ── Check in scheduled appointment (Receptionist/Admin) ───
+const checkInAppointment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid appointment ID",
+      });
+    }
+
+    const appointment = await Appointment.findById(id);
+    if (!appointment) {
+      return res.status(404).json({
+        success: false,
+        message: "Appointment not found",
+      });
+    }
+
+    // Validate transition: confirmed -> in-queue
+    const check = validateStatusTransition(appointment.status, "in-queue");
+    if (!check.allowed) {
+      return res.status(400).json({
+        success: false,
+        message: check.message,
+      });
+    }
+
+    appointment.status = "in-queue";
+    appointment.checkInTime = new Date();
+    await appointment.save();
+
+    const populated = await Appointment.findById(appointment._id)
+      .populate("patient", "name email phone")
+      .populate({
+        path: "doctor",
+        select: "specialization userId",
+        populate: { path: "userId", select: "name" },
+      })
+      .populate("department", "name");
+
+    return res.status(200).json({
+      success: true,
+      message: "Patient checked in successfully; status updated to in-queue",
+      appointment: populated,
+    });
+  } catch (error) {
+    console.error("Check-in error:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: "Server error during check-in",
+    });
+  }
+};
+
+// ── Doctor starts consultation (Doctor only) ──────────────
+const startConsultation = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid appointment ID",
+      });
+    }
+
+    const appointment = await Appointment.findById(id);
+    if (!appointment) {
+      return res.status(404).json({
+        success: false,
+        message: "Appointment not found",
+      });
+    }
+
+    const doctor = await Doctor.findOne({ userId: req.user.userId });
+    if (!doctor || appointment.doctor.toString() !== doctor._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only start consultations for your own appointments",
+      });
+    }
+
+    // Validate transition: in-queue -> in-consultation
+    const check = validateStatusTransition(appointment.status, "in-consultation");
+    if (!check.allowed) {
+      return res.status(400).json({
+        success: false,
+        message: check.message,
+      });
+    }
+
+    appointment.status = "in-consultation";
+    appointment.consultationStartTime = new Date();
+    await appointment.save();
+
+    const populated = await Appointment.findById(appointment._id)
+      .populate("patient", "name email phone")
+      .populate({
+        path: "doctor",
+        select: "specialization userId",
+        populate: { path: "userId", select: "name" },
+      })
+      .populate("department", "name");
+
+    return res.status(200).json({
+      success: true,
+      message: "Consultation started successfully",
+      appointment: populated,
+    });
+  } catch (error) {
+    console.error("Start consultation error:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: "Server error during starting consultation",
+    });
+  }
+};
+
+// ── Doctor ends consultation (Doctor only) ────────────────
+const endConsultation = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid appointment ID",
+      });
+    }
+
+    const appointment = await Appointment.findById(id);
+    if (!appointment) {
+      return res.status(404).json({
+        success: false,
+        message: "Appointment not found",
+      });
+    }
+
+    const doctor = await Doctor.findOne({ userId: req.user.userId });
+    if (!doctor || appointment.doctor.toString() !== doctor._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only complete consultations for your own appointments",
+      });
+    }
+
+    // Validate transition: in-consultation -> completed
+    const check = validateStatusTransition(appointment.status, "completed");
+    if (!check.allowed) {
+      return res.status(400).json({
+        success: false,
+        message: check.message,
+      });
+    }
+
+    appointment.status = "completed";
+    appointment.consultationEndTime = new Date();
+    await appointment.save();
+
+    const populated = await Appointment.findById(appointment._id)
+      .populate("patient", "name email phone")
+      .populate({
+        path: "doctor",
+        select: "specialization userId",
+        populate: { path: "userId", select: "name" },
+      })
+      .populate("department", "name");
+
+    return res.status(200).json({
+      success: true,
+      message: "Consultation completed successfully",
+      appointment: populated,
+    });
+  } catch (error) {
+    console.error("End consultation error:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: "Server error during completing consultation",
+    });
+  }
+};
+
 module.exports = {
   bookAppointment,
+  createWalkInAppointment,
   getMyAppointments,
   getDoctorAppointments,
   getAllAppointments,
   getAppointmentById,
+  checkInAppointment,
+  startConsultation,
+  endConsultation,
   cancelAppointment,
   rescheduleAppointment,
   updateAppointmentStatus,

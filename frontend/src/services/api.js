@@ -189,6 +189,26 @@ export const updateAppointmentStatus = async (id, statusData) => {
   return response.data;
 };
 
+export const createWalkInAppointment = async (walkInData) => {
+  const response = await api.post('/api/appointments/walk-in', walkInData);
+  return response.data;
+};
+
+export const checkInAppointment = async (id) => {
+  const response = await api.patch(`/api/appointments/${id}/check-in`);
+  return response.data;
+};
+
+export const startConsultation = async (id) => {
+  const response = await api.patch(`/api/appointments/${id}/start-consultation`);
+  return response.data;
+};
+
+export const endConsultation = async (id) => {
+  const response = await api.patch(`/api/appointments/${id}/end-consultation`);
+  return response.data;
+};
+
 /* =========================================================================
    PRESCRIPTIONS API
    ========================================================================= */

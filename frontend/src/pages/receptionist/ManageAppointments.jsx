@@ -3,6 +3,8 @@ import {
   getAllAppointments,
   getDoctors,
   updateAppointmentStatus,
+  checkInAppointment,
+  createWalkInAppointment,
   getErrorMessage,
 } from '../../services/api';
 import {
@@ -19,6 +21,7 @@ import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
+import Modal from '../../components/ui/Modal';
 import Alert from '../../components/ui/Alert';
 import {
   IoCalendarOutline,
@@ -27,6 +30,7 @@ import {
   IoSearchOutline,
   IoTimeOutline,
   IoRefreshOutline,
+  IoPersonAddOutline,
 } from 'react-icons/io5';
 
 const ManageAppointments = () => {
@@ -41,6 +45,18 @@ const ManageAppointments = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [doctorFilter, setDoctorFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('');
+
+  // Walk-In Modal state
+  const [isWalkInOpen, setIsWalkInOpen] = useState(false);
+  const [walkInForm, setWalkInForm] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    doctorId: '',
+    reason: '',
+  });
+  const [walkInSubmitting, setWalkInSubmitting] = useState(false);
+  const [walkInError, setWalkInError] = useState('');
 
   const fetchData = async () => {
     try {
@@ -80,6 +96,49 @@ const ManageAppointments = () => {
     }
   };
 
+  const handleCheckIn = async (id) => {
+    setActionLoadingId(id);
+    try {
+      await checkInAppointment(id);
+      await fetchData();
+    } catch (err) {
+      console.error('Error checking in patient:', err);
+      setError(getErrorMessage(err));
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleWalkInSubmit = async (e) => {
+    e.preventDefault();
+    if (!walkInForm.name.trim() || !walkInForm.phone.trim() || !walkInForm.doctorId || !walkInForm.reason.trim()) {
+      setWalkInError('Please fill in patient name, phone, doctor, and reason for visit.');
+      return;
+    }
+
+    setWalkInSubmitting(true);
+    setWalkInError('');
+    try {
+      await createWalkInAppointment({
+        patient: {
+          name: walkInForm.name.trim(),
+          phone: walkInForm.phone.trim(),
+          email: walkInForm.email.trim() || undefined,
+        },
+        doctorId: walkInForm.doctorId,
+        reason: walkInForm.reason.trim(),
+      });
+      setIsWalkInOpen(false);
+      setWalkInForm({ name: '', phone: '', email: '', doctorId: '', reason: '' });
+      await fetchData();
+    } catch (err) {
+      console.error('Error creating walk-in appointment:', err);
+      setWalkInError(getErrorMessage(err));
+    } finally {
+      setWalkInSubmitting(false);
+    }
+  };
+
   // Filter logic
   const filteredAppointments = appointments.filter((appt) => {
     if (statusFilter !== 'all' && appt.status !== statusFilter) {
@@ -112,15 +171,25 @@ const ManageAppointments = () => {
             Search patient records, check scheduled visits, and manage arrival statuses
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          icon={IoRefreshOutline}
-          onClick={fetchData}
-          isLoading={loading}
-        >
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2.5">
+          <Button
+            variant="primary"
+            size="sm"
+            icon={IoPersonAddOutline}
+            onClick={() => setIsWalkInOpen(true)}
+          >
+            New Walk-In Patient
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            icon={IoRefreshOutline}
+            onClick={fetchData}
+            isLoading={loading}
+          >
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {error && <Alert type="error" message={error} onClose={() => setError('')} />}
@@ -277,18 +346,29 @@ const ManageAppointments = () => {
                         )}
                         {appt.status === 'confirmed' && (
                           <Button
-                            variant="secondary"
+                            variant="primary"
                             size="sm"
                             icon={IoCheckmarkOutline}
                             isLoading={isActionLoading}
-                            onClick={() => handleStatusUpdate(appt._id, 'completed')}
+                            onClick={() => handleCheckIn(appt._id)}
                           >
-                            Mark Completed
+                            Check In
                           </Button>
+                        )}
+                        {appt.status === 'in-queue' && (
+                          <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-200">
+                            In Queue
+                          </span>
+                        )}
+                        {appt.status === 'in-consultation' && (
+                          <span className="text-xs font-semibold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-md border border-purple-200">
+                            In Consult
+                          </span>
                         )}
                         {(appt.status === 'completed' ||
                           appt.status === 'cancelled' ||
-                          appt.status === 'rejected') && (
+                          appt.status === 'rejected' ||
+                          appt.status === 'missed') && (
                           <span className="text-xs text-slate-400 italic">Settled</span>
                         )}
                       </div>
@@ -300,6 +380,115 @@ const ManageAppointments = () => {
           </tbody>
         </Table>
       </TableContainer>
+
+      {/* Walk-in Registration Modal */}
+      <Modal
+        isOpen={isWalkInOpen}
+        onClose={() => {
+          setIsWalkInOpen(false);
+          setWalkInError('');
+        }}
+        title="Register Walk-In Patient"
+        subtitle="Create an immediate walk-in consultation and place patient directly into today's queue"
+      >
+        <form onSubmit={handleWalkInSubmit} className="space-y-4">
+          {walkInError && (
+            <Alert type="error" message={walkInError} onClose={() => setWalkInError('')} />
+          )}
+
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+              Full Name *
+            </label>
+            <Input
+              required
+              placeholder="e.g. Ramesh Kumar"
+              value={walkInForm.name}
+              onChange={(e) => setWalkInForm({ ...walkInForm, name: e.target.value })}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+                Phone Number *
+              </label>
+              <Input
+                required
+                type="tel"
+                placeholder="10-digit mobile"
+                value={walkInForm.phone}
+                onChange={(e) => setWalkInForm({ ...walkInForm, phone: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+                Email Address (Optional)
+              </label>
+              <Input
+                type="email"
+                placeholder="patient@example.com"
+                value={walkInForm.email}
+                onChange={(e) => setWalkInForm({ ...walkInForm, email: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+              Assign Doctor *
+            </label>
+            <Select
+              required
+              value={walkInForm.doctorId}
+              onChange={(e) => setWalkInForm({ ...walkInForm, doctorId: e.target.value })}
+              placeholder="Select available physician"
+            >
+              {doctors.map((doc) => (
+                <option key={doc._id} value={doc._id}>
+                  Dr. {doc.userId?.name || doc.name} ({doc.specialization} - {doc.department?.name || 'General'})
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+              Reason / Chief Complaint *
+            </label>
+            <textarea
+              required
+              rows={3}
+              className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              placeholder="e.g. High fever, persistent cough for 2 days"
+              value={walkInForm.reason}
+              onChange={(e) => setWalkInForm({ ...walkInForm, reason: e.target.value })}
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setIsWalkInOpen(false);
+                setWalkInError('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              size="sm"
+              isLoading={walkInSubmitting}
+            >
+              Register & Add to Queue
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

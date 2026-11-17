@@ -146,8 +146,12 @@ appointmentSchema.pre("validate", function () {
 });
 
 appointmentSchema.pre("save", function () {
-  if (this.isModified("status") || this.isNew) {
-    this.isSlotActive = !["cancelled", "rejected", "missed"].includes(this.status);
+  if (this.isModified("status") || this.isModified("appointmentType") || this.isNew) {
+    if (this.appointmentType === "walk-in") {
+      this.isSlotActive = false;
+    } else {
+      this.isSlotActive = !["cancelled", "rejected", "missed"].includes(this.status);
+    }
   }
 });
 

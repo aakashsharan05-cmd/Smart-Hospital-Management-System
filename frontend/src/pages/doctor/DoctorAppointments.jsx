@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import {
   getDoctorAppointments,
   updateAppointmentStatus,
+  startConsultation,
+  endConsultation,
   getPrescriptionsByAppointment,
   getErrorMessage,
 } from '../../services/api';
@@ -74,6 +76,30 @@ const DoctorAppointments = () => {
       await fetchAppointments();
     } catch (err) {
       console.error(`Error updating status to ${newStatus}:`, err);
+      setError(getErrorMessage(err));
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleStartConsultation = async (id) => {
+    setActionLoadingId(id);
+    try {
+      await startConsultation(id);
+      await fetchAppointments();
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleEndConsultation = async (id) => {
+    setActionLoadingId(id);
+    try {
+      await endConsultation(id);
+      await fetchAppointments();
+    } catch (err) {
       setError(getErrorMessage(err));
     } finally {
       setActionLoadingId(null);
@@ -264,16 +290,39 @@ const DoctorAppointments = () => {
                           </>
                         )}
 
-                        {(appt.status === 'in-consultation' || appt.status === 'completed') && (
-                          <Link to={`/doctor/prescriptions/create/${appt._id}`}>
+                        {appt.status === 'in-queue' && (
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            icon={IoCheckmarkOutline}
+                            isLoading={isActionLoading}
+                            onClick={() => handleStartConsultation(appt._id)}
+                          >
+                            Start Consult
+                          </Button>
+                        )}
+
+                        {appt.status === 'in-consultation' && (
+                          <>
+                            <Link to={`/doctor/prescriptions/create/${appt._id}`}>
+                              <Button
+                                variant="primary"
+                                size="sm"
+                                icon={IoDocumentTextOutline}
+                              >
+                                Prescribe
+                              </Button>
+                            </Link>
                             <Button
-                              variant="primary"
+                              variant="success"
                               size="sm"
-                              icon={IoDocumentTextOutline}
+                              icon={IoCheckmarkOutline}
+                              isLoading={isActionLoading}
+                              onClick={() => handleEndConsultation(appt._id)}
                             >
-                              Prescribe
+                              End Consult
                             </Button>
-                          </Link>
+                          </>
                         )}
 
                         {appt.status === 'completed' && (

@@ -6,17 +6,53 @@ const { authorizeRoles } = require("../middleware/role.middleware");
 
 const {
   bookAppointment,
+  createWalkInAppointment,
   getMyAppointments,
   getDoctorAppointments,
   getAllAppointments,
   getAppointmentById,
+  checkInAppointment,
+  startConsultation,
+  endConsultation,
   cancelAppointment,
   rescheduleAppointment,
   updateAppointmentStatus,
 } = require("../controllers/appointment.Controller");
 
-// Patient books appointment
+// Patient books scheduled appointment
 router.post("/", protect, authorizeRoles("patient"), bookAppointment);
+
+// Receptionist / Admin registers walk-in patient & appointment
+router.post(
+  "/walk-in",
+  protect,
+  authorizeRoles("receptionist", "admin"),
+  createWalkInAppointment
+);
+
+// Receptionist / Admin checks in a confirmed patient (confirmed -> in-queue)
+router.patch(
+  "/:id/check-in",
+  protect,
+  authorizeRoles("receptionist", "admin"),
+  checkInAppointment
+);
+
+// Doctor starts consultation (in-queue -> in-consultation)
+router.patch(
+  "/:id/start-consultation",
+  protect,
+  authorizeRoles("doctor"),
+  startConsultation
+);
+
+// Doctor ends consultation (in-consultation -> completed)
+router.patch(
+  "/:id/end-consultation",
+  protect,
+  authorizeRoles("doctor"),
+  endConsultation
+);
 
 // Patient views own appointments
 router.get("/my", protect, authorizeRoles("patient"), getMyAppointments);
