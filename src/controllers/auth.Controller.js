@@ -103,6 +103,13 @@ const loginUser = async (req, res) => {
       });
     }
 
+    if (!existingUser.isActive) {
+      return res.status(403).json({
+        success: false,
+        message: "Account has been deactivated",
+      });
+    }
+
     const token = jwt.sign(
       {
         userId: existingUser._id,
