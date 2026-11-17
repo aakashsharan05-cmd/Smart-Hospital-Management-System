@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   getDepartments,
@@ -126,27 +126,38 @@ const BookAppointment = () => {
     };
   }, [selectedDepartment]);
 
+  const triageRequestIdRef = useRef(0);
+
   // 3. Debounced AI Symptom Triage Suggestion (500ms delay, minimum 5 chars)
   useEffect(() => {
     const text = reason.trim();
     if (text.length < 5) {
+      triageRequestIdRef.current++;
       setTriageResult(null);
       setTriageLoading(false);
       return;
     }
 
+    // Invalidate previous in-flight requests and clear stale recommendation immediately
+    const currentRequestId = ++triageRequestIdRef.current;
+    setTriageResult(null);
+    setTriageLoading(true);
+
     const timer = setTimeout(async () => {
       try {
-        setTriageLoading(true);
         const res = await getTriageSuggestion(text);
-        if (res.success && res.triage) {
-          setTriageResult(res.triage);
+        if (currentRequestId === triageRequestIdRef.current) {
+          if (res.success && res.triage) {
+            setTriageResult(res.triage);
+          }
         }
       } catch (err) {
         // Triage is non-blocking; do not disrupt booking flow if rate-limited
         console.error('Triage suggestion unavailable:', err);
       } finally {
-        setTriageLoading(false);
+        if (currentRequestId === triageRequestIdRef.current) {
+          setTriageLoading(false);
+        }
       }
     }, 500);
 
@@ -446,8 +457,16 @@ const BookAppointment = () => {
                 <span>{reason.length}/500</span>
               </div>
 
+              {/* Loading indicator while analyzing */}
+              {triageLoading && (
+                <div className="p-3.5 rounded-xl bg-indigo-50/50 border border-indigo-100 flex items-center gap-2 text-xs text-indigo-700 animate-pulse text-left">
+                  <IoSparklesOutline className="animate-spin w-4 h-4 text-indigo-600 shrink-0" />
+                  <span>Analyzing symptoms with clinical AI triage...</span>
+                </div>
+              )}
+
               {/* High-Urgency Emergency Notice */}
-              {triageResult?.urgency === 'high' && (
+              {!triageLoading && triageResult?.urgency === 'high' && (
                 <div className="p-4 rounded-xl bg-red-50 border border-red-300 text-red-900 space-y-1.5 animate-fade-in">
                   <div className="flex items-center gap-2 font-bold text-red-800 text-sm">
                     <IoWarningOutline className="w-5 h-5 text-red-600 shrink-0" />
@@ -460,7 +479,7 @@ const BookAppointment = () => {
               )}
 
               {/* Interactive AI Triage Suggestion Card */}
-              {triageResult && (
+              {!triageLoading && triageResult && (
                 <div className="p-4 rounded-xl bg-indigo-50/70 border border-indigo-200/80 space-y-3 animate-fade-in text-left">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center gap-1.5 font-semibold text-indigo-950 text-sm">
@@ -480,23 +499,33 @@ const BookAppointment = () => {
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between flex-wrap gap-3 pt-1">
-                    <div>
-                      <span className="text-xs text-slate-600">Suggested Department: </span>
-                      <span className="text-sm font-bold text-slate-900">
-                        {triageResult.suggestedDepartment}
-                      </span>
-                    </div>
+                  {triageResult.suggestedDepartment ? (
+                    <div className="flex items-center justify-between flex-wrap gap-3 pt-1">
+                      <div>
+                        <span className="text-xs text-slate-600">Suggested Department: </span>
+                        <span className="text-sm font-bold text-slate-900">
+                          {triageResult.suggestedDepartment}
+                        </span>
+                      </div>
 
-                    <button
-                      type="button"
-                      onClick={handleApplySuggestedDept}
-                      className="text-xs font-semibold px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors cursor-pointer shadow-xs flex items-center gap-1"
-                    >
-                      <IoShieldCheckmarkOutline className="w-3.5 h-3.5" />
-                      Select {triageResult.suggestedDepartment}
-                    </button>
-                  </div>
+                      {departments.some(
+                        (d) => d.name.toLowerCase() === triageResult.suggestedDepartment.toLowerCase()
+                      ) && (
+                        <button
+                          type="button"
+                          onClick={handleApplySuggestedDept}
+                          className="text-xs font-semibold px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors cursor-pointer shadow-xs flex items-center gap-1"
+                        >
+                          <IoShieldCheckmarkOutline className="w-3.5 h-3.5" />
+                          Select {triageResult.suggestedDepartment}
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="pt-1 text-xs text-slate-600">
+                      No active hospital department specifically matches these symptoms. Please select a department manually or consult General Medicine when available.
+                    </div>
+                  )}
 
                   <div className="pt-2 border-t border-indigo-200/60 text-[11px] text-slate-500 italic">
                     {triageResult.disclaimer || 'AI suggestion only, not a medical diagnosis.'}

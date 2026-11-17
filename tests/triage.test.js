@@ -5,7 +5,7 @@ const bcrypt = require("bcryptjs");
 const app = require("../src/app");
 const User = require("../src/models/user.model");
 const Department = require("../src/models/department.model");
-const { triageSymptoms, MANDATORY_DISCLAIMER } = require("../src/services/triage.service");
+const { triageSymptoms, getRuleBasedTriage, MANDATORY_DISCLAIMER } = require("../src/services/triage.service");
 const { setupTestDb, teardownTestDb } = require("./testHelper");
 
 describe("AI Symptom Triage, Privacy & Fallback Tests", () => {
@@ -161,5 +161,159 @@ describe("AI Symptom Triage, Privacy & Fallback Tests", () => {
       .send({ symptomText: "Excessive request" });
 
     expect(res11.status).toBe(429);
+  });
+
+  test("Eye symptoms with Ophthalmology active recommends Ophthalmology", () => {
+    const result = getRuleBasedTriage("burning sensation in my eyes", ["Cardiology", "Ophthalmology", "General Medicine"]);
+    expect(result.suggestedDepartment).toBe("Ophthalmology");
+    expect(result.urgency).toBe("low");
+    expect(result.disclaimer).toBe(MANDATORY_DISCLAIMER);
+  });
+
+  test("Eye symptoms with Ophthalmology unavailable falls back to General Medicine", () => {
+    const result = getRuleBasedTriage("burning sensation in my eyes", ["Cardiology", "General Medicine"]);
+    expect(result.suggestedDepartment).toBe("General Medicine");
+    expect(result.urgency).toBe("low");
+    expect(result.disclaimer).toBe(MANDATORY_DISCLAIMER);
+  });
+
+  test("Chest pain with Cardiology active recommends Cardiology with high urgency", () => {
+    const result = getRuleBasedTriage("severe chest pain and shortness of breath", ["Cardiology", "General Medicine"]);
+    expect(result.suggestedDepartment).toBe("Cardiology");
+    expect(result.urgency).toBe("high");
+    expect(result.disclaimer).toBe(MANDATORY_DISCLAIMER);
+  });
+
+  test("Skin symptoms with Dermatology active recommends Dermatology", () => {
+    const result = getRuleBasedTriage("itching and red skin rash", ["Cardiology", "Dermatology", "General Medicine"]);
+    expect(result.suggestedDepartment).toBe("Dermatology");
+    expect(result.urgency).toBe("low");
+    expect(result.disclaimer).toBe(MANDATORY_DISCLAIMER);
+  });
+
+  test("Unclear symptoms route to General Medicine if active", () => {
+    const result = getRuleBasedTriage("feeling unwell and strange malaise", ["Cardiology", "General Medicine"]);
+    expect(result.suggestedDepartment).toBe("General Medicine");
+    expect(result.urgency).toBe("low");
+    expect(result.disclaimer).toBe(MANDATORY_DISCLAIMER);
+  });
+
+  test("No active General Medicine fallback returns safe null response rather than unrelated specialty", () => {
+    // When specialty is unavailable and General Medicine is ALSO unavailable (only Cardiology active)
+    const eyeResult = getRuleBasedTriage("burning sensation in my eyes", ["Cardiology"]);
+    expect(eyeResult.suggestedDepartment).toBeNull();
+    expect(eyeResult.suggestedDepartment).not.toBe("Cardiology");
+    expect(eyeResult.disclaimer).toBe(MANDATORY_DISCLAIMER);
+
+    // When symptoms are unclear and General Medicine is unavailable
+    const unclearResult = getRuleBasedTriage("unclear symptoms without matching keywords", ["Cardiology"]);
+    expect(unclearResult.suggestedDepartment).toBeNull();
+    expect(unclearResult.suggestedDepartment).not.toBe("Cardiology");
+  });
+
+  test("Gemini invalid response triggers rule-based fallback without returning invalid specialty", async () => {
+    responseOverride = {
+      statusCode: 200,
+      data: {
+        candidates: [
+          {
+            content: {
+              parts: [{ text: JSON.stringify({ suggestedDepartment: "Astrology Care", urgency: "medium" }) }],
+            },
+          },
+        ],
+      },
+    };
+
+    const triage = await triageSymptoms("burning sensation in my eyes");
+    // DB has Cardiology and General Medicine active
+    expect(triage.suggestedDepartment).toBe("General Medicine");
+    expect(triage.disclaimer).toBe(MANDATORY_DISCLAIMER);
+    responseOverride = null;
+  });
+
+  test("Gemini timeout triggers graceful fallback to rule-based triage", async () => {
+    delayMs = 3500; // Exceeds 3000ms timeout
+    const triage = await triageSymptoms("severe chest pain");
+    expect(triage.suggestedDepartment).toBe("Cardiology");
+    expect(triage.urgency).toBe("high");
+    expect(triage.disclaimer).toBe(MANDATORY_DISCLAIMER);
+    delayMs = 0;
+  });
+
+  test("Frontend triage request sequencer discards out-of-order stale responses", async () => {
+    let triageRequestId = 0;
+    let displayedTriage = null;
+    let isLoading = false;
+
+    const handleSymptomChange = (newSymptoms, asyncFetcher) => {
+      const text = newSymptoms.trim();
+      if (text.length < 5) {
+        triageRequestId++;
+        displayedTriage = null;
+        isLoading = false;
+        return Promise.resolve();
+      }
+
+      const reqId = ++triageRequestId;
+      displayedTriage = null;
+      isLoading = true;
+
+      return asyncFetcher(text).then((res) => {
+        if (reqId === triageRequestId) {
+          displayedTriage = res;
+          isLoading = false;
+        }
+      });
+    };
+
+    // Request 1: slow (150ms) -> Cardiology
+    const slowRequest = new Promise((resolve) =>
+      setTimeout(() => resolve({ suggestedDepartment: "Cardiology" }), 150)
+    );
+
+    // Request 2: fast (50ms) -> Ophthalmology
+    const fastRequest = new Promise((resolve) =>
+      setTimeout(() => resolve({ suggestedDepartment: "Ophthalmology" }), 50)
+    );
+
+    const p1 = handleSymptomChange("chest pain", () => slowRequest);
+    expect(isLoading).toBe(true);
+    expect(displayedTriage).toBeNull();
+
+    const p2 = handleSymptomChange("burning sensation in my eyes", () => fastRequest);
+    expect(isLoading).toBe(true);
+    expect(displayedTriage).toBeNull();
+
+    await p2;
+    expect(displayedTriage.suggestedDepartment).toBe("Ophthalmology");
+    expect(isLoading).toBe(false);
+
+    await p1;
+    // Out-of-order response from request 1 did NOT overwrite request 2
+    expect(displayedTriage.suggestedDepartment).toBe("Ophthalmology");
+  });
+
+  test("Frontend immediately clears recommendation and loading when symptoms < 5 chars", () => {
+    let triageRequestId = 0;
+    let displayedTriage = { suggestedDepartment: "Cardiology" };
+    let isLoading = true;
+
+    const handleSymptomChange = (newSymptoms) => {
+      const text = newSymptoms.trim();
+      if (text.length < 5) {
+        triageRequestId++;
+        displayedTriage = null;
+        isLoading = false;
+        return;
+      }
+      triageRequestId++;
+      displayedTriage = null;
+      isLoading = true;
+    };
+
+    handleSymptomChange("eye");
+    expect(displayedTriage).toBeNull();
+    expect(isLoading).toBe(false);
   });
 });

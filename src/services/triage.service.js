@@ -21,52 +21,189 @@ const KEYWORD_RULES = [
   {
     department: "Cardiology",
     urgency: "high",
-    keywords: ["chest pain", "heart", "palpitation", "angina", "shortness of breath", "breathless", "cardiac"],
+    keywords: [
+      "chest pain",
+      "heart",
+      "palpitation",
+      "angina",
+      "shortness of breath",
+      "breathless",
+      "cardiac",
+      "heart attack",
+      "irregular heartbeat",
+      "chest tightness",
+      "chest pressure",
+      "racing heart",
+    ],
   },
   {
     department: "Neurology",
     urgency: "high",
-    keywords: ["seizure", "convulsion", "stroke", "paralysis", "loss of consciousness", "fainting"],
+    keywords: [
+      "seizure",
+      "convulsion",
+      "stroke",
+      "paralysis",
+      "loss of consciousness",
+      "fainting",
+      "facial drooping",
+      "slurred speech",
+    ],
   },
   {
     department: "Neurology",
     urgency: "medium",
-    keywords: ["headache", "migraine", "dizziness", "vertigo", "numbness", "tremor"],
+    keywords: [
+      "headache",
+      "migraine",
+      "dizziness",
+      "vertigo",
+      "numbness",
+      "tremor",
+      "tingling sensation",
+      "confusion",
+      "memory loss",
+    ],
   },
   {
     department: "Orthopedics",
     urgency: "medium",
-    keywords: ["bone", "fracture", "joint", "sprain", "dislocation", "back pain", "knee", "spine", "arthritis"],
+    keywords: [
+      "bone",
+      "fracture",
+      "joint",
+      "sprain",
+      "dislocation",
+      "back pain",
+      "knee",
+      "spine",
+      "arthritis",
+      "hip pain",
+      "shoulder pain",
+      "swollen joint",
+      "ligament",
+      "muscle tear",
+    ],
   },
   {
     department: "Pediatrics",
     urgency: "medium",
-    keywords: ["child", "infant", "baby", "toddler", "pediatric", "vaccination", "newborn"],
+    keywords: [
+      "child",
+      "infant",
+      "baby",
+      "toddler",
+      "pediatric",
+      "vaccination",
+      "newborn",
+      "pediatric fever",
+    ],
   },
   {
     department: "Dermatology",
     urgency: "low",
-    keywords: ["skin", "rash", "itching", "acne", "eczema", "psoriasis", "mole", "allergy", "hives"],
+    keywords: [
+      "skin",
+      "rash",
+      "itching",
+      "itchy",
+      "acne",
+      "eczema",
+      "psoriasis",
+      "mole",
+      "allergy",
+      "hives",
+      "dermatitis",
+      "boil",
+      "skin lesion",
+      "blister",
+      "dry skin",
+      "red patches",
+      "peeling skin",
+    ],
   },
   {
     department: "ENT",
     urgency: "low",
-    keywords: ["ear", "hearing", "earache", "nose", "throat", "sore throat", "sinus", "tonsil"],
+    keywords: [
+      "ear",
+      "hearing",
+      "earache",
+      "nose",
+      "throat",
+      "sore throat",
+      "sinus",
+      "tonsil",
+      "nasal",
+      "congestion",
+      "ear discharge",
+      "hoarseness",
+      "loss of smell",
+      "ringing in ear",
+      "tinnitus",
+    ],
   },
   {
     department: "Ophthalmology",
     urgency: "low",
-    keywords: ["eye", "vision", "blur", "blurred", "cataract", "redness in eye", "glasses", "sight"],
+    keywords: [
+      "burning sensation in my eyes",
+      "burning sensation in eye",
+      "burning eyes",
+      "eye",
+      "eyes",
+      "vision",
+      "blur",
+      "blurred",
+      "cataract",
+      "redness in eye",
+      "glasses",
+      "sight",
+      "stinging eyes",
+      "itchy eyes",
+      "watery eyes",
+      "ocular",
+      "irritation in eye",
+      "conjunctivitis",
+      "double vision",
+      "eye pain",
+    ],
   },
   {
     department: "General Medicine",
     urgency: "medium",
-    keywords: ["high fever", "severe vomiting", "dehydration", "food poisoning"],
+    keywords: [
+      "high fever",
+      "severe vomiting",
+      "dehydration",
+      "food poisoning",
+      "persistent vomiting",
+      "high temperature",
+    ],
   },
   {
     department: "General Medicine",
     urgency: "low",
-    keywords: ["fever", "cold", "cough", "flu", "weakness", "fatigue", "body ache", "stomach ache", "headache", "nausea"],
+    keywords: [
+      "fever",
+      "cold",
+      "cough",
+      "flu",
+      "weakness",
+      "fatigue",
+      "body ache",
+      "stomach ache",
+      "headache",
+      "nausea",
+      "vomiting",
+      "malaise",
+      "unwell",
+      "stomach pain",
+      "diarrhea",
+      "chills",
+      "exhaustion",
+      "loss of appetite",
+    ],
   },
 ];
 
@@ -75,7 +212,7 @@ const KEYWORD_RULES = [
  *
  * @param {string} text
  * @param {string[]} activeDepartmentNames
- * @returns {{ suggestedDepartment: string, urgency: "low" | "medium" | "high", disclaimer: string }}
+ * @returns {{ suggestedDepartment: string | null, urgency: "low" | "medium" | "high", disclaimer: string }}
  */
 const getRuleBasedTriage = (text, activeDepartmentNames = []) => {
   const normalized = (text || "").toLowerCase();
@@ -91,24 +228,37 @@ const getRuleBasedTriage = (text, activeDepartmentNames = []) => {
     }
   }
 
-  // Ensure the resolved department is active in the database
+  // Find if General Medicine is among active departments
+  const activeGeneralMed = activeDepartmentNames.find(
+    (name) => name.toLowerCase() === "general medicine"
+  );
+
   let finalDepartment = null;
 
   if (matchedDept) {
+    // Check if the matched specialty is active in the hospital database
     const directMatch = activeDepartmentNames.find(
       (name) => name.toLowerCase() === matchedDept.toLowerCase()
     );
+
     if (directMatch) {
       finalDepartment = directMatch;
+    } else if (activeGeneralMed) {
+      // If the matched specialty is unavailable, use active General Medicine if available
+      finalDepartment = activeGeneralMed;
+    } else {
+      // If General Medicine is also unavailable, return a safe no-suitable-department response (null)
+      // rather than blindly assigning an unrelated specialty like Cardiology
+      finalDepartment = null;
     }
-  }
-
-  // If no match or matched department is not active, resolve to active General Medicine or first active department
-  if (!finalDepartment) {
-    const generalMed = activeDepartmentNames.find(
-      (name) => name.toLowerCase() === "general medicine"
-    );
-    finalDepartment = generalMed || activeDepartmentNames[0] || "General Medicine";
+  } else {
+    // Unclear or generic symptoms (no specific keyword match)
+    // Route to General Medicine if active; otherwise return null
+    if (activeGeneralMed) {
+      finalDepartment = activeGeneralMed;
+    } else {
+      finalDepartment = null;
+    }
   }
 
   return {
@@ -122,7 +272,7 @@ const getRuleBasedTriage = (text, activeDepartmentNames = []) => {
  * Generate symptom triage recommendation using Gemini API with 3.0s timeout and active department validation.
  *
  * @param {string} symptomText
- * @returns {Promise<{ suggestedDepartment: string, urgency: "low" | "medium" | "high", disclaimer: string }>}
+ * @returns {Promise<{ suggestedDepartment: string | null, urgency: "low" | "medium" | "high", disclaimer: string }>}
  */
 const triageSymptoms = async (symptomText) => {
   // Fetch only active departments from MongoDB
@@ -132,7 +282,7 @@ const triageSymptoms = async (symptomText) => {
   // If no active departments in DB, fallback safely
   if (activeDepartmentNames.length === 0) {
     return {
-      suggestedDepartment: "General Medicine",
+      suggestedDepartment: null,
       urgency: "low",
       disclaimer: MANDATORY_DISCLAIMER,
     };
