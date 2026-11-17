@@ -1,7 +1,9 @@
 import { useEffect, useState, useRef } from 'react';
 import { io } from 'socket.io-client';
+import { getToken } from '../utils/auth';
 
 export const useQueueSocket = ({ onQueueUpdate, onStatusChange } = {}) => {
+  const [currentToken, setCurrentToken] = useState(() => getToken());
   const [isConnected, setIsConnected] = useState(false);
   const [lastQueueUpdate, setLastQueueUpdate] = useState(null);
   const [lastStatusChange, setLastStatusChange] = useState(null);
@@ -15,9 +17,31 @@ export const useQueueSocket = ({ onQueueUpdate, onStatusChange } = {}) => {
     statusCallbackRef.current = onStatusChange;
   }, [onQueueUpdate, onStatusChange]);
 
+  // Sync token state on cross-tab storage changes and intra-tab updates
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const syncToken = () => {
+      const latestToken = getToken();
+      setCurrentToken((prev) => (prev !== latestToken ? latestToken : prev));
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', syncToken);
+      const interval = setInterval(syncToken, 1000);
+
+      return () => {
+        window.removeEventListener('storage', syncToken);
+        clearInterval(interval);
+      };
+    }
+  }, []);
+
+  useEffect(() => {
+    const token = currentToken;
     if (!token) {
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
       setIsConnected(false);
       return;
     }
@@ -73,7 +97,7 @@ export const useQueueSocket = ({ onQueueUpdate, onStatusChange } = {}) => {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, []);
+  }, [currentToken]);
 
   return {
     isConnected,

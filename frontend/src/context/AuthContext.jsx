@@ -1,18 +1,19 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { loginUser, registerUser, getCurrentUser } from '../services/api';
+import { getToken, setStoredToken, removeStoredAuth, USER_KEY } from '../utils/auth';
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('shms_user');
     try {
+      const saved = typeof window !== 'undefined' ? localStorage.getItem(USER_KEY) : null;
       return saved ? JSON.parse(saved) : null;
     } catch {
       return null;
     }
   });
-  const [token, setToken] = useState(() => localStorage.getItem('shms_token') || null);
+  const [token, setToken] = useState(() => getToken());
   const [loading, setLoading] = useState(true);
 
   // Validate session on mount
@@ -20,7 +21,7 @@ export const AuthProvider = ({ children }) => {
     let isMounted = true;
 
     const verifySession = async () => {
-      const storedToken = localStorage.getItem('shms_token');
+      const storedToken = getToken();
       if (!storedToken) {
         if (isMounted) {
           setUser(null);
@@ -35,15 +36,14 @@ export const AuthProvider = ({ children }) => {
         if (response && response.success && response.user) {
           if (isMounted) {
             setUser(response.user);
-            localStorage.setItem('shms_user', JSON.stringify(response.user));
+            localStorage.setItem(USER_KEY, JSON.stringify(response.user));
           }
         } else {
           // Token invalid or user not found
           if (isMounted) {
             setUser(null);
             setToken(null);
-            localStorage.removeItem('shms_token');
-            localStorage.removeItem('shms_user');
+            removeStoredAuth();
           }
         }
       } catch (err) {
@@ -51,8 +51,7 @@ export const AuthProvider = ({ children }) => {
         if (isMounted) {
           setUser(null);
           setToken(null);
-          localStorage.removeItem('shms_token');
-          localStorage.removeItem('shms_user');
+          removeStoredAuth();
         }
       } finally {
         if (isMounted) {
@@ -73,8 +72,8 @@ export const AuthProvider = ({ children }) => {
     if (data.token && data.user) {
       setToken(data.token);
       setUser(data.user);
-      localStorage.setItem('shms_token', data.token);
-      localStorage.setItem('shms_user', JSON.stringify(data.user));
+      setStoredToken(data.token);
+      localStorage.setItem(USER_KEY, JSON.stringify(data.user));
     }
     return data;
   };
@@ -84,8 +83,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    localStorage.removeItem('shms_token');
-    localStorage.removeItem('shms_user');
+    removeStoredAuth();
     setUser(null);
     setToken(null);
     window.location.href = '/login';

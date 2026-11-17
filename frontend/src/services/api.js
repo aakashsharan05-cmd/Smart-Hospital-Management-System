@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getToken, removeStoredAuth } from '../utils/auth';
 
 // Create Axios instance with base configuration
 const api = axios.create({
@@ -11,7 +12,7 @@ const api = axios.create({
 // Request interceptor to attach JWT token
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('shms_token');
+    const token = getToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -26,8 +27,7 @@ api.interceptors.response.use(
   (error) => {
     if (error.response && error.response.status === 401) {
       // Clear token and user on 401 Unauthorized
-      localStorage.removeItem('shms_token');
-      localStorage.removeItem('shms_user');
+      removeStoredAuth();
       if (
         !window.location.pathname.includes('/login') &&
         !window.location.pathname.includes('/register')
