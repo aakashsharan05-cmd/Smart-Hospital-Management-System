@@ -135,24 +135,35 @@ const emitQueueUpdate = async (doctorId) => {
       .populate("department", "name")
       .sort({ queueNumber: 1, checkInTime: 1 });
 
-    const payload = {
+    const staffPayload = {
       doctorId: doctorIdStr,
       queue,
       count: queue.length,
       timestamp: new Date(),
     };
 
-    io.to(`doctor:${doctorIdStr}`).to("staff").emit("queue:update", payload);
+    io.to(`doctor:${doctorIdStr}`).to("staff").emit("queue:update", staffPayload);
 
-    // Also notify each patient in the queue with their current position
+    // Also notify each patient in the queue with strictly isolated payload (Zero PII of other patients)
     queue.forEach((appt, idx) => {
       const patientId = appt.patient?._id?.toString() || appt.patient?.toString();
       if (patientId) {
-        io.to(`patient:${patientId}`).emit("queue:update", {
-          ...payload,
+        const patientPayload = {
+          doctorId: doctorIdStr,
           myPosition: idx + 1,
-          myAppointment: appt,
-        });
+          patientsAhead: idx,
+          queueCount: queue.length,
+          myAppointment: {
+            _id: appt._id,
+            status: appt.status,
+            queueNumber: appt.queueNumber,
+            predictedWaitMinutes: appt.predictedWaitMinutes,
+            typicalErrorMinutes: appt.typicalErrorMinutes,
+            waitPredictionSource: appt.waitPredictionSource,
+          },
+          timestamp: staffPayload.timestamp,
+        };
+        io.to(`patient:${patientId}`).emit("queue:update", patientPayload);
       }
     });
   } catch (err) {

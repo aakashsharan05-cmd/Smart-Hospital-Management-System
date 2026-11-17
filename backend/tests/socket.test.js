@@ -159,4 +159,91 @@ describe("Socket.IO Authentication, Rooms & Rollback Suppression Tests", () => {
     expect(eventEmitted).toBe(false);
     socket.disconnect();
   });
+
+  test("Privacy: Patient A receives strictly isolated payload with no trace of Patient B name/phone/email", async () => {
+    // 1. Create Patient A and Patient B
+    const patientAUser = await User.create({
+      name: "Patient Alice",
+      email: "alice.privacy@hospital.com",
+      password: await bcrypt.hash("Pass123!", 10),
+      phone: "+919555511111",
+      role: "patient",
+      isActive: true,
+    });
+
+    const patientBUser = await User.create({
+      name: "Patient Bob Secret",
+      email: "bob.sensitive@hospital.com",
+      password: await bcrypt.hash("Pass123!", 10),
+      phone: "+919555522222",
+      role: "patient",
+      isActive: true,
+    });
+
+    const tokenA = jwt.sign(
+      { userId: patientAUser._id.toString(), role: "patient" },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+
+    // 2. Connect Patient A socket
+    const socketA = Client(`http://127.0.0.1:${port}`, {
+      auth: { token: tokenA },
+      transports: ["websocket"],
+      reconnection: false,
+    });
+
+    await new Promise((resolve) => socketA.on("connect", resolve));
+
+    // 3. Register Patient A as walk-in
+    await createWalkInAppointmentService({
+      patientId: patientAUser._id.toString(),
+      doctorId: doctor._id.toString(),
+      reason: "Patient A consultation",
+    });
+
+    // Prepare listener on socketA for queue:update
+    const queueUpdatePromise = new Promise((resolve) => {
+      socketA.on("queue:update", (data) => {
+        resolve(data);
+      });
+    });
+
+    // Register Patient B (triggers emitQueueUpdate)
+    await createWalkInAppointmentService({
+      patientId: patientBUser._id.toString(),
+      doctorId: doctor._id.toString(),
+      reason: "Patient B consultation",
+    });
+
+    const payloadA = await queueUpdatePromise;
+
+    // Verify Patient A payload structure: ONLY allowed fields
+    expect(payloadA).toHaveProperty("doctorId");
+    expect(payloadA).toHaveProperty("myPosition");
+    expect(payloadA).toHaveProperty("patientsAhead");
+    expect(payloadA).toHaveProperty("queueCount");
+    expect(payloadA).toHaveProperty("myAppointment");
+    expect(payloadA).toHaveProperty("timestamp");
+
+    // Must NOT have 'queue' array of all patients
+    expect(payloadA.queue).toBeUndefined();
+
+    // Verify myAppointment structure
+    expect(payloadA.myAppointment).toHaveProperty("_id");
+    expect(payloadA.myAppointment).toHaveProperty("status");
+    expect(payloadA.myAppointment).toHaveProperty("queueNumber");
+    expect(payloadA.myAppointment).toHaveProperty("predictedWaitMinutes");
+    expect(payloadA.myAppointment).toHaveProperty("typicalErrorMinutes");
+    expect(payloadA.myAppointment).toHaveProperty("waitPredictionSource");
+
+    // Zero trace of Patient B's PII in payload
+    const serialized = JSON.stringify(payloadA);
+    expect(serialized).not.toContain("Bob");
+    expect(serialized).not.toContain("bob.sensitive@hospital.com");
+    expect(serialized).not.toContain("+919555522222");
+    expect(serialized).not.toContain("9555522222");
+
+    socketA.disconnect();
+  });
 });
